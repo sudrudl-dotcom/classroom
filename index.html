@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>우리 교실</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#f7f5f0;font-family:'Noto Sans KR',sans-serif;-webkit-tap-highlight-color:transparent}
+#root{min-height:100vh}
+@import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#f7f5f0;font-family:'Noto Sans KR',sans-serif;-webkit-tap-highlight-color:transparent}
+
+/* 스피너 */
+.spinner{display:flex;align-items:center;justify-content:center;padding:40px}
+.spin-circle{width:36px;height:36px;border:3px solid #eee;border-top-color:#4a7a4e;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 랜딩 */
+.landing{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#fff9f0,#f0f7ff)}
+.landing-inner{text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
+.landing-emoji{font-size:64px;animation:bounce 1.6s infinite ease-in-out}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.landing-title{font-family:'Gaegu',cursive;font-size:52px;color:#2d3a2e}
+.landing-sub{font-size:18px;color:#888}
+.landing-btns{display:flex;gap:24px;margin-top:8px}
+.land-btn{display:flex;flex-direction:column;align-items:center;gap:10px;width:140px;padding:28px 16px;border-radius:24px;border:none;cursor:pointer;transition:transform .18s,box-shadow .18s;font-family:'Noto Sans KR',sans-serif}
+.land-btn:hover{transform:translateY(-6px);box-shadow:0 12px 32px rgba(0,0,0,.13)}
+.land-btn.teacher{background:#2d3a2e;color:#fff}
+.land-btn.student{background:#fff;color:#2d3a2e;border:2px solid #2d3a2e}
+.lb-icon{font-size:36px}.lb-label{font-size:18px;font-weight:700}
+
+.app-root{min-height:100vh;background:#f7f5f0}
+.mode-switch{position:fixed;top:12px;left:12px;z-index:200}
+.mode-back-btn{background:rgba(255,255,255,.9);border:1px solid #ddd;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+
+/* 선생님 */
+.teacher-wrap{min-height:100vh}
+.t-header{background:#2d3a2e;color:#fff;padding:0 24px;display:flex;align-items:center;gap:24px;height:60px;position:sticky;top:0;z-index:100}
+.t-logo{font-family:'Gaegu',cursive;font-size:22px;color:#a8d5a2;white-space:nowrap}
+.t-nav{display:flex;gap:4px}
+.t-nav-btn{background:none;border:none;color:#aaccaa;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-family:'Noto Sans KR',sans-serif;transition:all .15s}
+.t-nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.t-nav-btn.active{background:rgba(255,255,255,.15);color:#fff}
+
+.writings-layout{display:flex;height:calc(100vh - 60px)}
+.writings-sidebar{width:190px;flex-shrink:0;background:#fff;border-right:1px solid #eee;overflow-y:auto;padding:16px 0}
+.ws-title{font-size:11px;font-weight:700;color:#aaa;padding:0 16px 10px;text-transform:uppercase;letter-spacing:.05em}
+.ws-item{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;cursor:pointer;transition:background .12s}
+.ws-item:hover{background:#f5f5f5}
+.ws-item.active{background:#f0f7f0}
+.ws-name{font-weight:600;color:#2d3a2e;font-size:14px}
+.ws-badges-mini{display:flex;gap:4px}
+.dot{width:8px;height:8px;border-radius:50%;background:#e0e0e0}
+.dot.on{background:#4a7a4e}
+.ws-empty{padding:20px 16px;font-size:13px;color:#bbb}
+
+.writings-main{flex:1;overflow-y:auto;padding:28px 36px;display:flex;flex-direction:column}
+.no-select{color:#bbb;font-size:15px;text-align:center;margin:80px auto}
+.wm-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;padding-bottom:16px;border-bottom:2px solid #eee}
+.wm-name{font-family:'Gaegu',cursive;font-size:32px;font-weight:700}
+.wm-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wm-count{font-size:13px;color:#aaa}
+
+.copy-btn{padding:6px 14px;border-radius:20px;border:1.5px solid #ddd;background:#fafafa;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;color:#888;transition:all .15s;white-space:nowrap}
+.copy-btn:hover{border-color:#4a7a4e;color:#2d3a2e;background:#f0f7f0}
+.copy-btn.copied{border-color:#4a7a4e;background:#e8f5e9;color:#2a7a40;font-weight:600}
+
+.entry-card{background:#fff;border-radius:16px;padding:28px 32px;margin-bottom:24px;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1px solid #f0ede8}
+.ec-top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ec-date{font-size:11px;color:#c8a96e;letter-spacing:.08em;font-weight:600}
+.ec-title{font-family:'Gaegu',cursive;font-size:26px;color:#2d3a2e;margin-bottom:14px;line-height:1.3}
+.ec-content{font-size:15px;line-height:2.1;color:#333;white-space:pre-wrap;margin-bottom:12px;user-select:text;cursor:text}
+
+.comment-list{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding-top:16px;border-top:1px dashed #eee}
+.comment-item{display:flex;gap:12px;align-items:flex-start}
+.ci-avatar{flex-shrink:0;background:#2d3a2e;color:#fff;font-size:11px;font-weight:700;padding:5px 8px;border-radius:8px}
+.ci-body{flex:1}
+.ci-text{font-size:14px;line-height:1.8;color:#333;white-space:pre-wrap}
+.ci-meta{display:flex;align-items:center;gap:10px;margin-top:4px}
+.ci-meta span{font-size:11px;color:#bbb}
+.ci-del{background:none;border:none;font-size:11px;color:#ddd;cursor:pointer}
+.ci-del:hover{color:#e55}
+
+.comment-input-area{padding-top:16px;border-top:1px dashed #eee;display:flex;flex-direction:column;gap:8px}
+.comment-textarea{width:100%;min-height:80px;padding:12px 14px;border:1.5px solid #e0e8e0;border-radius:12px;font-size:14px;line-height:1.7;resize:vertical;outline:none;font-family:'Noto Sans KR',sans-serif;transition:border .15s}
+.comment-textarea:focus{border-color:#4a7a4e}
+.comment-btns{display:flex;justify-content:flex-end}
+.send-comment-btn{padding:10px 22px;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;color:#fff;font-family:'Noto Sans KR',sans-serif}
+.send-comment-btn:disabled{opacity:.35;cursor:not-allowed}
+
+.t-content{max-width:860px;margin:0 auto;padding:28px 24px;display:flex;flex-direction:column;gap:28px}
+.t-section{display:flex;flex-direction:column;gap:14px}
+.section-title{font-size:18px;font-weight:700;color:#2d3a2e}
+.mission-edit{display:flex;gap:10px}
+.mission-input{flex:1;padding:12px 16px;border-radius:12px;border:2px solid #ddd;font-size:15px;outline:none;font-family:'Noto Sans KR',sans-serif}
+.mission-input:focus{border-color:#4a7a4e}
+.mission-save-btn{padding:12px 24px;background:#2d3a2e;color:#fff;border:none;border-radius:12px;cursor:pointer;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif}
+.add-row{display:flex;gap:10px}
+.add-input{flex:1;padding:12px 16px;border-radius:12px;border:2px solid #ddd;font-size:15px;outline:none;font-family:'Noto Sans KR',sans-serif}
+.add-confirm-btn{padding:12px 20px;background:#4a7a4e;color:#fff;border:none;border-radius:12px;cursor:pointer;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif}
+.student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.student-card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:8px}
+.sc-name{font-weight:700;font-size:16px;color:#2d3a2e}
+.sc-today-label{font-size:11px;color:#aaa;font-weight:600}
+.sc-badges{display:flex;gap:4px;flex-wrap:wrap}
+.badge{font-size:11px;padding:3px 8px;border-radius:20px;background:#f0f0f0;color:#aaa}
+.badge.on{background:#e8f5e9;color:#2d3a2e}
+.del-s-btn{align-self:flex-end;background:none;border:1px solid #eee;border-radius:8px;padding:3px 10px;font-size:12px;cursor:pointer;color:#aaa}
+.del-s-btn:hover{background:#ffeeee;color:#e55;border-color:#ffbbbb}
+
+/* 학생 */
+.student-select-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:#fffdf7;padding:40px 20px}
+.ss-title{font-family:'Gaegu',cursive;font-size:38px;color:#2d3a2e}
+.ss-grid{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:560px}
+.ss-card{width:100px;height:118px;border-radius:20px;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:transform .18s,box-shadow .18s;font-family:'Noto Sans KR',sans-serif}
+.ss-card:hover{transform:translateY(-5px) scale(1.04);box-shadow:0 10px 28px rgba(0,0,0,.15)}
+.ss-avatar{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff}
+.ss-card-name{font-size:14px;font-weight:700;color:#fff}
+.empty-msg{color:#bbb;font-size:15px;text-align:center;padding:40px}
+
+.notif-banner{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#e07b6a;color:#fff;padding:10px 28px;border-radius:20px;font-size:14px;font-weight:700;z-index:200;cursor:pointer;box-shadow:0 4px 16px rgba(224,123,106,.4);animation:slidein .3s ease;white-space:nowrap}
+@keyframes slidein{from{top:50px;opacity:0}to{top:68px;opacity:1}}
+.notif-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:300}
+.notif-modal{background:#fff;border-radius:20px;padding:28px;max-width:380px;width:90%;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.nm-title{font-family:'Gaegu',cursive;font-size:24px;color:#2d3a2e}
+.nm-item{background:#f0f7f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.nm-date{font-size:11px;color:#5B9E8F;font-weight:700}
+.nm-text{font-size:14px;line-height:1.8;color:#333}
+.nm-close{background:#2d3a2e;color:#fff;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+
+.s-header{display:flex;align-items:center;gap:12px;padding:0 20px;height:56px;position:sticky;top:0;z-index:50}
+.back-s-btn{background:rgba(255,255,255,.3);border:none;color:#fff;border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
+.s-header-name{font-family:'Gaegu',cursive;font-size:22px;color:#fff;flex:1}
+.s-fb-badge{background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:20px;padding:6px 14px;cursor:pointer;font-size:13px;font-family:'Noto Sans KR',sans-serif;position:relative}
+.unread-dot{width:8px;height:8px;background:#ff4757;border-radius:50%;position:absolute;top:-2px;right:-2px}
+
+.s-tabs{display:flex;background:#fff;border-bottom:1px solid #eee;position:sticky;top:56px;z-index:40}
+.s-tab-btn{flex:1;padding:14px 8px;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;font-size:13px;font-family:'Noto Sans KR',sans-serif;font-weight:600;color:#aaa;transition:all .15s}
+.s-body{padding:24px 20px;max-width:600px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+
+.writing-tab{display:flex;flex-direction:column;gap:16px}
+.notebook-paper{background:#fff;border-radius:16px;padding:24px 24px 16px;box-shadow:0 4px 20px rgba(0,0,0,.07);position:relative;overflow:hidden;background-image:repeating-linear-gradient(transparent,transparent 31px,#e4f0e4 31px,#e4f0e4 32px);background-position:0 42px}
+.np-redline{position:absolute;left:56px;top:0;bottom:0;width:2px;background:#ffb3ba;opacity:.5}
+.np-title-input{width:100%;border:none;outline:none;font-family:'Gaegu',cursive;font-size:24px;color:#2d3a2e;padding:0 0 12px 64px;background:transparent;border-bottom:2px dashed #e0e0e0;line-height:32px}
+.np-title-input::placeholder{color:#ccc}
+.np-rule{height:12px}
+.np-content{width:100%;min-height:180px;border:none;outline:none;resize:none;font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:32px;color:#333;background:transparent;padding:0 0 0 64px}
+.np-content::placeholder{color:#ccc}
+.np-footer{display:flex;justify-content:flex-end;padding-top:10px}
+.line-counter{font-size:12px;padding:4px 12px;border-radius:20px}
+.line-counter.ok{color:#4a7a4e;background:#e8f5e9}
+.line-counter.warn{color:#b8860b;background:#fff8e1}
+
+.submit-btn{width:100%;padding:16px;border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:transform .15s,box-shadow .15s}
+.submit-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.15)}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed}
+
+.s-comment-preview{background:#f0f7f0;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.scp-label{font-size:12px;font-weight:700;color:#4a7a4e}
+.scp-item{display:flex;flex-direction:column;gap:4px}
+.scp-text{font-size:14px;line-height:1.8;color:#333;white-space:pre-wrap}
+
+.math-tab{display:flex;flex-direction:column;gap:16px}
+.math-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.mc-label{font-size:15px;font-weight:700;color:#2d3a2e;margin-bottom:14px}
+.wrong-count-row{display:flex;gap:8px;flex-wrap:wrap}
+.wc-btn{width:52px;height:52px;border-radius:12px;border:2px solid #e0e0e0;background:#fafafa;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s}
+.reason-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.reason-btn{padding:12px;border-radius:12px;border:2px solid #e0e0e0;background:#fafafa;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;font-weight:600;transition:all .15s}
+.done-btn{width:100%;padding:16px;border-radius:14px;border:2px solid #ddd;background:#fafafa;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;color:#2d3a2e;transition:all .2s}
+
+.mission-tab{display:flex;flex-direction:column;gap:16px}
+.mission-banner{border-radius:16px;border:2px solid;padding:20px}
+.mb-label{font-size:12px;font-weight:700;color:#888;margin-bottom:6px}
+.mb-text{font-family:'Gaegu',cursive;font-size:22px;color:#2d3a2e}
+.mission-comment-input{width:100%;min-height:90px;padding:14px;border-radius:14px;border:2px solid #e0e0e0;font-size:14px;line-height:1.8;resize:none;outline:none;font-family:'Noto Sans KR',sans-serif;background:#fff}
+.mission-comment-input:focus{border-color:#4a7a4e}
+
+/* 모바일 */
+@media(max-width:600px){
+  .landing-title{font-size:38px}
+  .land-btn{width:120px;padding:22px 12px}
+  .t-header{padding:0 8px;gap:8px;height:52px}
+  .t-logo{display:none}
+  .t-nav-btn{padding:6px 10px;font-size:12px}
+  .writings-layout{flex-direction:column;height:auto;min-height:100vh}
+  .writings-sidebar{width:100%;height:auto;border-right:none;border-bottom:1px solid #eee;padding:8px 0;display:flex;flex-direction:row;overflow-x:auto;overflow-y:hidden}
+  .ws-title{display:none}
+  .ws-item{flex-direction:column;align-items:center;padding:8px 14px;min-width:60px;border-left:none !important;border-bottom:3px solid transparent;white-space:nowrap;gap:4px}
+  .ws-item.active{background:#f0f7f0;border-bottom:3px solid #4a7a4e}
+  .writings-main{padding:16px}
+  .wm-header{flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px}
+  .wm-name{font-size:26px}
+  .entry-card{padding:18px 16px}
+  .ec-title{font-size:20px}
+  .t-content{padding:16px}
+  .mission-edit,.add-row{flex-direction:column}
+  .mission-save-btn,.add-confirm-btn{width:100%}
+  .ss-title{font-size:30px}
+  .ss-card{width:84px;height:100px}
+  .s-tab-btn{font-size:11px;padding:12px 4px}
+  .np-redline{display:none}
+  .np-title-input{padding:0 0 12px 0;font-size:20px}
+  .np-content{padding:0;font-size:14px;line-height:28px}
+  .notif-banner{width:90%;text-align:center;font-size:13px;padding:10px 16px}
+  .wc-btn{width:44px;height:44px;font-size:12px}
+  .reason-grid{grid-template-columns:1fr}
+}
+
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+// ─── Supabase 설정 ────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://igyahhjpkqahdwfeccao.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlneWFoaGpwa3FhaGR3ZmVjY2FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5ODk4NTQsImV4cCI6MjA5NTU2NTg1NH0.8tAoPtTOBsaRYSt2_JP9ZD1eDwH5CHlTX74TE5oWv2c";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const COLORS = ["#E07B6A","#E09B50","#C9B84C","#5B9E8F","#5A8FC2","#8B7CC8","#C26E9A"];
+
+function today() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function fmtTime() {
+  return new Date().toLocaleString("ko-KR",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+
+// ─── 복사 버튼 ────────────────────────────────────────────────────────────────
+function CopyBtn({ text, label = "복사" }) {
+  const [copied, setCopied] = React.useState(false);
+  return (
+    <button className={`copy-btn ${copied?"copied":""}`}
+      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),1800); }}>
+      {copied ? "✓ 복사됨" : label}
+    </button>
+  );
+}
+
+// ─── 로딩 스피너 ─────────────────────────────────────────────────────────────
+function Spinner() {
+  return <div className="spinner"><div className="spin-circle"/></div>;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEACHER VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function TeacherView() {
+  const [tab, setTab] = React.useState("writings");
+  const [students, setStudents] = React.useState([]);
+  const [selectedId, setSelectedId] = React.useState(null);
+  const [writings, setWritings] = React.useState([]);
+  const [comments, setComments] = React.useState({});
+  const [commentDraft, setCommentDraft] = React.useState({});
+  const [mission, setMission] = React.useState("오늘의 미션을 입력하세요");
+  const [missionSaved, setMissionSaved] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [sending, setSending] = React.useState({});
+  const [todaySubs, setTodaySubs] = React.useState({});
+  const [addError, setAddError] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+
+  const dateKey = today();
+  const selected = students.find(s => s.id === selectedId);
+
+  // 학생 목록 불러오기
+  React.useEffect(() => {
+    loadStudents();
+    loadMission();
+  }, []);
+
+  // 학생 선택시 글 불러오기
+  React.useEffect(() => {
+    if (selectedId) loadWritings(selectedId);
+  }, [selectedId]);
+
+  // 오늘 제출 현황
+  React.useEffect(() => {
+    if (students.length > 0) loadTodaySubs();
+  }, [students]);
+
+  // 실시간 구독 설정
+  React.useEffect(() => {
+    // writings, maths, mission_submissions 변경 시 오늘 현황 새로고침
+    const channel = sb.channel('teacher-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'writings' }, () => {
+        loadTodaySubs();
+        if (selectedId) loadWritings(selectedId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'maths' }, () => {
+        loadTodaySubs();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mission_submissions' }, () => {
+        loadTodaySubs();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, () => {
+        if (selectedId) loadWritings(selectedId);
+      })
+      .subscribe();
+    return () => sb.removeChannel(channel);
+  }, [selectedId]);
+
+
+  async function loadStudents() {
+    setLoading(true);
+    const { data } = await sb.from("students").select("*").order("created_at");
+    setStudents(data || []);
+    setLoading(false);
+  }
+
+  async function loadMission() {
+    const { data } = await sb.from("missions").select("*").eq("date", today()).maybeSingle();
+    if (data) setMission(data.content);
+  }
+
+  async function loadWritings(studentId) {
+    const { data } = await sb.from("writings").select("*")
+      .eq("student_id", studentId).order("date", { ascending: false });
+    setWritings(data || []);
+    // 각 글의 댓글도 불러오기
+    const dates = (data||[]).map(w => w.date);
+    if (dates.length > 0) {
+      const { data: cData } = await sb.from("comments").select("*")
+        .eq("student_id", studentId).in("date", dates).order("created_at");
+      const grouped = {};
+      (cData||[]).forEach(c => {
+        if (!grouped[c.date]) grouped[c.date] = [];
+        grouped[c.date].push(c);
+      });
+      setComments(grouped);
+    } else {
+      setComments({});
+    }
+  }
+
+  async function loadTodaySubs() {
+    const ids = students.map(s => s.id);
+    const { data: wData } = await sb.from("writings").select("student_id").in("student_id", ids).eq("date", dateKey);
+    const { data: mData } = await sb.from("maths").select("student_id,done").in("student_id", ids).eq("date", dateKey);
+    const { data: msData } = await sb.from("mission_submissions").select("student_id,done").in("student_id", ids).eq("date", dateKey);
+    const subs = {};
+    ids.forEach(id => {
+      subs[id] = {
+        writing: !!(wData||[]).find(w => w.student_id === id),
+        math: !!(mData||[]).find(m => m.student_id === id && m.done),
+        mission: !!(msData||[]).find(m => m.student_id === id && m.done),
+      };
+    });
+    setTodaySubs(subs);
+  }
+
+  async function addStudent() {
+    const n = newName.trim(); if (!n) return;
+    setAdding(true); setAddError("");
+    const color = COLORS[students.length % COLORS.length];
+    const { data, error } = await sb.from("students").insert({ name: n, color }).select().single();
+    setAdding(false);
+    if (error) { setAddError("등록 실패: " + (error.message || error.code || JSON.stringify(error))); return; }
+    if (data) { setStudents(p => [...p, data]); setNewName(""); }
+  }
+
+  async function removeStudent(id) {
+    await sb.from("students").delete().eq("id", id);
+    setStudents(p => p.filter(s => s.id !== id));
+    if (selectedId === id) { setSelectedId(null); setWritings([]); }
+  }
+
+  async function saveMission() {
+    await sb.from("missions").upsert({ content: mission, date: dateKey }, { onConflict: "date" });
+    setMissionSaved(true); setTimeout(() => setMissionSaved(false), 1500);
+  }
+
+  async function sendComment(studentId, date, text) {
+    if (!text?.trim()) return;
+    const key = `${studentId}_${date}`;
+    setSending(p => ({ ...p, [key]: true }));
+    const { data } = await sb.from("comments")
+      .insert({ student_id: studentId, date, text: text.trim() }).select().single();
+    // 알림 추가
+    await sb.from("notifications").insert({ student_id: studentId, message: "선생님이 댓글을 달았어요! 💬" });
+    setComments(p => ({ ...p, [date]: [...(p[date]||[]), data] }));
+    setCommentDraft(p => ({ ...p, [key]: "" }));
+    setSending(p => ({ ...p, [key]: false }));
+  }
+
+  async function deleteComment(studentId, date, commentId) {
+    await sb.from("comments").delete().eq("id", commentId);
+    setComments(p => ({ ...p, [date]: (p[date]||[]).filter(c => c.id !== commentId) }));
+  }
+
+  function buildCopyText(w) {
+    const coms = comments[w.date] || [];
+    return [
+      w.date,
+      w.title || "제목 없음",
+      "",
+      w.content || "",
+      ...(coms.length > 0 ? ["", "── 선생님 댓글 ──", ...coms.map(c => c.text)] : []),
+    ].join("\n");
+  }
+
+  function buildAllText() {
+    return writings.map(w => buildCopyText(w) + "\n\n" + "─".repeat(30)).join("\n\n");
+  }
+
+  if (loading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh"}}><Spinner/></div>;
+
+  return (
+    <div className="teacher-wrap">
+      <header className="t-header">
+        <div className="t-logo">🍀 선생님 교실</div>
+        <nav className="t-nav">
+          {[{key:"writings",label:"📖 글 & 댓글"},{key:"students",label:"👥 학생·미션"}].map(t => (
+            <button key={t.key} className={`t-nav-btn ${tab===t.key?"active":""}`} onClick={() => setTab(t.key)}>{t.label}</button>
+          ))}
+        </nav>
+      </header>
+
+      {/* ── 글 & 댓글 ── */}
+      {tab === "writings" && (
+        <div className="writings-layout">
+          <aside className="writings-sidebar">
+            <div className="ws-title">학생 선택</div>
+            {students.map(s => {
+              const sub = todaySubs[s.id] || {};
+              const writingCount = 0; // 성능상 전체 카운트는 선택시만
+              return (
+                <div key={s.id} className={`ws-item ${selectedId===s.id?"active":""}`}
+                  style={{borderLeft:`4px solid ${s.color}`}} onClick={() => setSelectedId(s.id)}>
+                  <span className="ws-name">{s.name}</span>
+                  <div className="ws-badges-mini">
+                    <span className={`dot ${sub.writing?"on":""}`}/>
+                    <span className={`dot ${sub.math?"on":""}`}/>
+                    <span className={`dot ${sub.mission?"on":""}`}/>
+                  </div>
+                </div>
+              );
+            })}
+            {students.length === 0 && <div className="ws-empty">학생을 먼저 등록하세요</div>}
+          </aside>
+
+          <main className="writings-main">
+            {!selected ? (
+              <div className="no-select">← 학생을 선택하면 글이 표시됩니다</div>
+            ) : (
+              <>
+                <div className="wm-header">
+                  <div className="wm-name" style={{color:selected.color}}>{selected.name}</div>
+                  <div className="wm-actions">
+                    <span className="wm-count">{writings.length}편</span>
+                    {writings.length > 0 && <CopyBtn label="📋 전체 복사" text={buildAllText()}/>}
+                  </div>
+                </div>
+
+                {writings.length === 0 && <div className="no-select" style={{marginTop:40}}>아직 제출한 글이 없어요</div>}
+
+                {writings.map(w => {
+                  const comList = comments[w.date] || [];
+                  const dk = `${selected.id}_${w.date}`;
+                  return (
+                    <article key={w.id} className="entry-card">
+                      <div className="ec-top-row">
+                        <div className="ec-date">{w.date}</div>
+                        <CopyBtn text={buildCopyText(w)}/>
+                      </div>
+                      <div className="ec-title">{w.title || "제목 없음"}</div>
+                      <div className="ec-content">{w.content}</div>
+
+                      {comList.length > 0 && (
+                        <div className="comment-list">
+                          {comList.map(c => (
+                            <div key={c.id} className="comment-item">
+                              <div className="ci-avatar">선생님</div>
+                              <div className="ci-body">
+                                <div className="ci-text">{c.text}</div>
+                                <div className="ci-meta">
+                                  <span>{c.created_at ? new Date(c.created_at).toLocaleString("ko-KR",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : ""}</span>
+                                  <button className="ci-del" onClick={() => deleteComment(selected.id, w.date, c.id)}>삭제</button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="comment-input-area">
+                        <textarea className="comment-textarea"
+                          placeholder="댓글을 입력하세요… (전송하면 학생에게 알림이 가요)"
+                          value={commentDraft[dk] || ""}
+                          onChange={e => setCommentDraft(p => ({...p, [dk]: e.target.value}))}/>
+                        <div className="comment-btns">
+                          <button className="send-comment-btn"
+                            disabled={!commentDraft[dk]?.trim() || sending[dk]}
+                            onClick={() => sendComment(selected.id, w.date, commentDraft[dk])}
+                            style={{background: selected.color}}>
+                            {sending[dk] ? "전송 중…" : "💬 댓글 달기"}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </>
+            )}
+          </main>
+        </div>
+      )}
+
+      {/* ── 학생·미션 관리 ── */}
+      {tab === "students" && (
+        <div className="t-content">
+          <div className="t-section">
+            <h2 className="section-title">오늘의 미션</h2>
+            <div className="mission-edit">
+              <input className="mission-input" value={mission} onChange={e => setMission(e.target.value)} placeholder="오늘의 미션 입력"/>
+              <button className="mission-save-btn" onClick={saveMission}>{missionSaved ? "✓ 저장됨" : "저장"}</button>
+            </div>
+          </div>
+          <div className="t-section">
+            <h2 className="section-title">학생 등록</h2>
+            <div className="add-row">
+              <input className="add-input" placeholder="학생 이름 입력 후 엔터" value={newName}
+                onChange={e => { setNewName(e.target.value); setAddError(""); }}
+                onKeyDown={e => e.key==="Enter" && addStudent()}/>
+              <button className="add-confirm-btn" onClick={addStudent} disabled={adding}>
+                {adding ? "등록 중…" : "+ 등록"}
+              </button>
+            </div>
+            {addError && <div style={{color:"#e55",fontSize:"13px",padding:"6px 4px",background:"#fff0f0",borderRadius:"8px",padding:"8px 12px"}}>{addError}</div>}
+            <div className="student-grid">
+              {students.map(s => {
+                const sub = todaySubs[s.id] || {};
+                return (
+                  <div key={s.id} className="student-card" style={{borderTop:`4px solid ${s.color}`}}>
+                    <div className="sc-name">{s.name}</div>
+                    <div className="sc-today-label">오늘 제출</div>
+                    <div className="sc-badges">
+                      <span className={`badge ${sub.writing?"on":""}`}>✏️ 글</span>
+                      <span className={`badge ${sub.math?"on":""}`}>🔢 수학</span>
+                      <span className={`badge ${sub.mission?"on":""}`}>🎯 미션</span>
+                    </div>
+                    <button className="del-s-btn" onClick={() => removeStudent(s.id)}>삭제</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STUDENT VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function StudentView() {
+  const [students, setStudents] = React.useState([]);
+  const [selectedId, setSelectedId] = React.useState(null);
+  const [tab, setTab] = React.useState("writing");
+  const [writing, setWriting] = React.useState({title:"", content:""});
+  const [math, setMath] = React.useState({wrong_count:0, wrong_reason:"", done:false});
+  const [missionData, setMissionData] = React.useState({done:false, comment:""});
+  const [missionText, setMissionText] = React.useState("오늘의 미션을 입력하세요");
+  const [myComments, setMyComments] = React.useState([]);
+  const [notifications, setNotifications] = React.useState([]);
+  const [showNotif, setShowNotif] = React.useState(false);
+  const [saved, setSaved] = React.useState({});
+  const [loading, setLoading] = React.useState(true);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const WRONG_REASONS = ["계산 실수","개념 이해 부족","문제를 잘못 읽음","풀이 방법 모름","시간 부족","기타"];
+  const dateKey = today();
+  const student = students.find(s => s.id === selectedId);
+  const lineCount = writing.content.split("\n").filter(l => l.trim()).length;
+
+  React.useEffect(() => {
+    loadStudents();
+  }, []);
+
+  React.useEffect(() => {
+    if (!selectedId) return;
+    loadTodayData();
+    loadMission();
+    loadMyComments();
+    loadNotifications();
+    // 실시간 알림 구독
+    const channel = sb.channel(`student-${selectedId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications',
+          filter: `student_id=eq.${selectedId}` }, () => {
+        loadNotifications();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments',
+          filter: `student_id=eq.${selectedId}` }, () => {
+        loadMyComments();
+        loadNotifications();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, () => {
+        loadMission();
+      })
+      .subscribe();
+    return () => sb.removeChannel(channel);
+  }, [selectedId]);
+
+  async function loadStudents() {
+    const { data } = await sb.from("students").select("*").order("created_at");
+    setStudents(data || []);
+    setLoading(false);
+  }
+
+  async function loadMission() {
+    const { data } = await sb.from("missions").select("*").eq("date", dateKey).maybeSingle();
+    if (data) setMissionText(data.content);
+  }
+
+  async function loadTodayData() {
+    const { data: w } = await sb.from("writings").select("*").eq("student_id", selectedId).eq("date", dateKey).maybeSingle();
+    if (w) setWriting({title: w.title||"", content: w.content||""});
+    const { data: m } = await sb.from("maths").select("*").eq("student_id", selectedId).eq("date", dateKey).maybeSingle();
+    if (m) setMath({wrong_count: m.wrong_count, wrong_reason: m.wrong_reason||"", done: m.done});
+    const { data: ms } = await sb.from("mission_submissions").select("*").eq("student_id", selectedId).eq("date", dateKey).maybeSingle();
+    if (ms) setMissionData({done: ms.done, comment: ms.comment||""});
+  }
+
+  async function loadMyComments() {
+    const { data } = await sb.from("comments").select("*")
+      .eq("student_id", selectedId).order("created_at", {ascending:false}).limit(10);
+    setMyComments(data || []);
+  }
+
+  async function loadNotifications() {
+    const { data } = await sb.from("notifications").select("*")
+      .eq("student_id", selectedId).eq("read", false).order("created_at", {ascending:false});
+    setNotifications(data || []);
+  }
+
+  async function markRead() {
+    await sb.from("notifications").update({read:true}).eq("student_id", selectedId).eq("read", false);
+    setNotifications([]);
+    setShowNotif(false);
+    loadMyComments();
+  }
+
+  async function saveWriting() {
+    if (!writing.content.trim()) return;
+    setSubmitting(true);
+    await sb.from("writings").upsert(
+      {student_id: selectedId, date: dateKey, title: writing.title, content: writing.content},
+      {onConflict: "student_id,date"}
+    );
+    setSubmitting(false);
+    setSaved(p => ({...p, writing:true}));
+    setTimeout(() => setSaved(p => ({...p, writing:false})), 2000);
+  }
+
+  async function saveMath() {
+    setSubmitting(true);
+    await sb.from("maths").upsert(
+      {student_id: selectedId, date: dateKey, wrong_count: math.wrong_count, wrong_reason: math.wrong_reason, done: math.done},
+      {onConflict: "student_id,date"}
+    );
+    setSubmitting(false);
+    setSaved(p => ({...p, math:true}));
+    setTimeout(() => setSaved(p => ({...p, math:false})), 2000);
+  }
+
+  async function saveMission() {
+    setSubmitting(true);
+    await sb.from("mission_submissions").upsert(
+      {student_id: selectedId, date: dateKey, done: missionData.done, comment: missionData.comment},
+      {onConflict: "student_id,date"}
+    );
+    setSubmitting(false);
+    setSaved(p => ({...p, mission:true}));
+    setTimeout(() => setSaved(p => ({...p, mission:false})), 2000);
+  }
+
+  if (loading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh"}}><Spinner/></div>;
+
+  // 이름 선택 화면
+  if (!selectedId) {
+    return (
+      <div className="student-select-wrap">
+        <div className="ss-title">🌟 내 이름을 찾아요!</div>
+        <div className="ss-grid">
+          {students.map(s => (
+            <button key={s.id} className="ss-card" style={{background:s.color}} onClick={() => setSelectedId(s.id)}>
+              <div className="ss-avatar">{s.name[0]}</div>
+              <div className="ss-card-name">{s.name}</div>
+            </button>
+          ))}
+        </div>
+        {students.length === 0 && <div className="empty-msg">선생님이 아직 학생을 등록하지 않았어요 😊</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="student-main">
+      {/* 알림 배너 */}
+      {notifications.length > 0 && (
+        <div className="notif-banner" onClick={() => setShowNotif(true)}>
+          🔔 선생님 댓글이 달렸어요! 확인해보세요
+        </div>
+      )}
+
+      {/* 알림 모달 */}
+      {showNotif && (
+        <div className="notif-overlay" onClick={markRead}>
+          <div className="notif-modal" onClick={e => e.stopPropagation()}>
+            <div className="nm-title">💬 선생님 댓글</div>
+            {myComments.slice(0,4).map(c => (
+              <div key={c.id} className="nm-item">
+                <div className="nm-date">{c.date}</div>
+                <div className="nm-text">{c.text}</div>
+              </div>
+            ))}
+            <button className="nm-close" onClick={markRead}>확인! ✓</button>
+          </div>
+        </div>
+      )}
+
+      <header className="s-header" style={{background:student.color}}>
+        <button className="back-s-btn" onClick={() => { setSelectedId(null); setWriting({title:"",content:""}); setMath({wrong_count:0,wrong_reason:"",done:false}); setMissionData({done:false,comment:""}); }}>←</button>
+        <div className="s-header-name">{student.name}의 오늘</div>
+        {myComments.length > 0 && (
+          <button className="s-fb-badge" onClick={() => setShowNotif(true)}>
+            💬 {myComments.length}
+            {notifications.length > 0 && <span className="unread-dot"/>}
+          </button>
+        )}
+      </header>
+
+      <nav className="s-tabs">
+        {[{key:"writing",label:"✏️ 글쓰기"},{key:"math",label:"🔢 수학"},{key:"mission",label:"🎯 미션"}].map(t => (
+          <button key={t.key} className={`s-tab-btn ${tab===t.key?"active":""}`}
+            style={tab===t.key?{borderBottom:`3px solid ${student.color}`,color:student.color}:{}}
+            onClick={() => setTab(t.key)}>{t.label}</button>
+        ))}
+      </nav>
+
+      <div className="s-body">
+        {/* 글쓰기 */}
+        {tab === "writing" && (
+          <div className="writing-tab">
+            <div className="notebook-paper">
+              <div className="np-redline"/>
+              <input className="np-title-input" placeholder="제목을 써 보세요 ✍️"
+                value={writing.title} onChange={e => setWriting({...writing, title:e.target.value})}/>
+              <div className="np-rule"/>
+              <textarea className="np-content" rows={8}
+                placeholder="오늘 있었던 일, 생각, 느낌을 자유롭게 써 보세요!"
+                value={writing.content} onChange={e => setWriting({...writing, content:e.target.value})}/>
+              <div className="np-footer">
+                <span className={`line-counter ${lineCount>=3?"ok":"warn"}`}>
+                  {lineCount}줄 {lineCount>=3?"✓":"(3줄 이상 권장)"}
+                </span>
+              </div>
+            </div>
+            <button className="submit-btn" style={{background:student.color}}
+              onClick={saveWriting} disabled={!writing.content.trim() || submitting}>
+              {saved.writing ? "✓ 저장됐어요!" : submitting ? "저장 중…" : "📤 제출하기"}
+            </button>
+
+            {/* 오늘 댓글 미리보기 */}
+            {myComments.filter(c => c.date === dateKey).length > 0 && (
+              <div className="s-comment-preview">
+                <div className="scp-label">💬 선생님 댓글</div>
+                {myComments.filter(c => c.date === dateKey).map(c => (
+                  <div key={c.id} className="scp-item">
+                    <div className="scp-text">{c.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 수학 */}
+        {tab === "math" && (
+          <div className="math-tab">
+            <div className="math-card">
+              <div className="mc-label">오늘 틀린 문제가 몇 개예요?</div>
+              <div className="wrong-count-row">
+                {[0,1,2,3,4,5,"6+"].map(n => (
+                  <button key={n} className={`wc-btn ${math.wrong_count===n?"active":""}`}
+                    style={math.wrong_count===n?{background:student.color,color:"#fff",borderColor:student.color}:{}}
+                    onClick={() => setMath({...math, wrong_count:n})}>{n}개</button>
+                ))}
+              </div>
+            </div>
+            {math.wrong_count !== 0 && (
+              <div className="math-card">
+                <div className="mc-label">왜 틀렸을까요?</div>
+                <div className="reason-grid">
+                  {WRONG_REASONS.map(r => (
+                    <button key={r} className={`reason-btn ${math.wrong_reason===r?"active":""}`}
+                      style={math.wrong_reason===r?{background:student.color,color:"#fff",borderColor:student.color}:{}}
+                      onClick={() => setMath({...math, wrong_reason:r})}>{r}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button className={`done-btn ${math.done?"done":""}`}
+              style={math.done?{background:student.color,borderColor:student.color,color:"#fff"}:{}}
+              onClick={() => setMath({...math, done:!math.done})}>
+              {math.done ? "✓ 오답 고치기 완료!" : "오답 고치기 완료 체크"}
+            </button>
+            <button className="submit-btn" style={{background:student.color}}
+              onClick={saveMath} disabled={submitting}>
+              {saved.math ? "✓ 저장됐어요!" : submitting ? "저장 중…" : "📤 제출하기"}
+            </button>
+          </div>
+        )}
+
+        {/* 미션 */}
+        {tab === "mission" && (
+          <div className="mission-tab">
+            <div className="mission-banner" style={{background:student.color+"22",borderColor:student.color}}>
+              <div className="mb-label">🎯 오늘의 미션</div>
+              <div className="mb-text">{missionText}</div>
+            </div>
+            <button className={`done-btn ${missionData.done?"done":""}`}
+              style={missionData.done?{background:student.color,borderColor:student.color,color:"#fff"}:{}}
+              onClick={() => setMissionData({...missionData, done:!missionData.done})}>
+              {missionData.done ? "✓ 완료했어요!" : "미션 완료 체크!"}
+            </button>
+            <div className="mc-label" style={{marginTop:8}}>한마디 (선택)</div>
+            <textarea className="mission-comment-input"
+              placeholder="미션 하고 나서 느낌을 써 보세요!"
+              value={missionData.comment}
+              onChange={e => setMissionData({...missionData, comment:e.target.value})}/>
+            <button className="submit-btn" style={{background:student.color}}
+              onClick={saveMission} disabled={submitting}>
+              {saved.mission ? "✓ 저장됐어요!" : submitting ? "저장 중…" : "📤 제출하기"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ═══════════════════════════════════════════════════════════════════════════════
+function App() {
+  const [mode, setMode] = React.useState(null);
+
+  if (!mode) return (
+    <div className="landing">
+      <div className="landing-inner">
+        <div className="landing-emoji">📚</div>
+        <h1 className="landing-title">우리 교실</h1>
+        <p className="landing-sub">누구세요?</p>
+        <div className="landing-btns">
+          <button className="land-btn teacher" onClick={() => setMode("teacher")}>
+            <span className="lb-icon">👩‍🏫</span><span className="lb-label">선생님</span>
+          </button>
+          <button className="land-btn student" onClick={() => setMode("student")}>
+            <span className="lb-icon">🧒</span><span className="lb-label">학생</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="app-root">
+      <div className="mode-switch">
+        <button className="mode-back-btn" onClick={() => setMode(null)}>← 처음으로</button>
+      </div>
+      {mode === "teacher" ? <TeacherView/> : <StudentView/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+
+  </script>
+</body>
+</html>
