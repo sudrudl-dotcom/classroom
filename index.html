@@ -272,6 +272,7 @@ function TeacherView() {
   const [todaySubs, setTodaySubs] = React.useState({});
   const [addError, setAddError] = React.useState("");
   const [adding, setAdding] = React.useState(false);
+  const [missionDate, setMissionDate] = React.useState(today());
   const [mathDetail, setMathDetail] = React.useState({});      // {studentId: {wrong_count,wrong_reason,memo,done}}
   const [missionDetail, setMissionDetail] = React.useState({}); // {studentId: {done,comment}}
   const [mathComments, setMathComments] = React.useState({});   // {studentId: [comments]}
@@ -320,6 +321,16 @@ function TeacherView() {
     return () => sb.removeChannel(channel);
   }, [selectedId]);
 
+
+  // 날짜 바뀔 때 해당 날짜 미션 로드
+  React.useEffect(() => {
+    loadMissionForDate(missionDate);
+  }, [missionDate]);
+
+  async function loadMissionForDate(date) {
+    const { data } = await sb.from("missions").select("*").eq("date", date).maybeSingle();
+    setMission(data ? data.content : "");
+  }
 
   async function loadStudents() {
     setLoading(true);
@@ -402,7 +413,7 @@ function TeacherView() {
   }
 
   async function saveMission() {
-    const { error } = await sb.from("missions").upsert({ content: mission, date: dateKey }, { onConflict: "date" });
+    const { error } = await sb.from("missions").upsert({ content: mission, date: missionDate }, { onConflict: "date" });
     if (error) { alert("미션 저장 실패: " + error.message); return; }
     setMissionSaved(true); setTimeout(() => setMissionSaved(false), 1500);
   }
@@ -577,7 +588,10 @@ function TeacherView() {
           <div className="t-section">
             <h2 className="section-title">오늘의 미션</h2>
             <div className="mission-edit">
-              <input className="mission-input" value={mission} onChange={e => setMission(e.target.value)} placeholder="오늘의 미션 입력"/>
+              <input type="date" value={missionDate} min={today()}
+                onChange={e => { setMissionDate(e.target.value); }}
+                style={{padding:"10px 12px",borderRadius:12,border:"2px solid #ddd",fontSize:14,fontFamily:"inherit",outline:"none",flexShrink:0}}/>
+              <input className="mission-input" value={mission} onChange={e => setMission(e.target.value)} placeholder="미션 내용 입력"/>
               <button className="mission-save-btn" onClick={saveMission}>{missionSaved ? "✓ 저장됨" : "저장"}</button>
             </div>
           </div>
@@ -769,6 +783,9 @@ function StudentView() {
   const [saved, setSaved] = React.useState({});
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
+  const [allWritings, setAllWritings] = React.useState([]);
+  const [allWritingComments, setAllWritingComments] = React.useState({});
+  const [showHistory, setShowHistory] = React.useState(false);
 
   const WRONG_REASONS = ["계산 실수","개념 이해 부족","문제를 잘못 읽음","풀이 방법 모름","시간 부족","기타"];
   const dateKey = today();
@@ -785,6 +802,7 @@ function StudentView() {
     loadMission();
     loadMyComments();
     loadNotifications();
+    loadAllWritings();
     // 실시간 알림 구독
     const channel = sb.channel(`student-${selectedId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications',
@@ -807,6 +825,24 @@ function StudentView() {
     const { data } = await sb.from("students").select("*").order("created_at");
     setStudents(data || []);
     setLoading(false);
+  }
+
+  async function loadAllWritings() {
+    const { data } = await sb.from("writings").select("*")
+      .eq("student_id", selectedId).order("date", {ascending: false});
+    const ws = data || [];
+    setAllWritings(ws);
+    const pastDates = ws.filter(w => w.date !== dateKey).map(w => w.date);
+    if (pastDates.length > 0) {
+      const { data: cData } = await sb.from("comments").select("*")
+        .eq("student_id", selectedId).in("date", pastDates).order("created_at");
+      const grouped = {};
+      (cData||[]).forEach(c => {
+        if (!grouped[c.date]) grouped[c.date] = [];
+        grouped[c.date].push(c);
+      });
+      setAllWritingComments(grouped);
+    }
   }
 
   async function loadMission() {
@@ -975,6 +1011,38 @@ function StudentView() {
                     <div className="scp-text">{c.text}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* 지난 글 보기 */}
+            {allWritings.filter(w => w.date !== dateKey).length > 0 && (
+              <div>
+                <button onClick={() => setShowHistory(h => !h)}
+                  style={{background:"none",border:"1.5px solid #ddd",borderRadius:20,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#666",width:"100%",marginTop:8}}>
+                  {showHistory ? "▲ 지난 글 접기" : `▼ 지난 글 보기 (${allWritings.filter(w=>w.date!==dateKey).length}편)`}
+                </button>
+                {showHistory && allWritings.filter(w => w.date !== dateKey).map(w => {
+                  const coms = allWritingComments[w.date] || [];
+                  return (
+                    <article key={w.id} className="entry-card" style={{marginTop:12}}>
+                      <div className="ec-date">{w.date}</div>
+                      <div className="ec-title">{w.title || "제목 없음"}</div>
+                      <div className="ec-content">{w.content}</div>
+                      {coms.length > 0 && (
+                        <div className="comment-list">
+                          {coms.map(c => (
+                            <div key={c.id} className="comment-item">
+                              <div className="ci-avatar">선생님</div>
+                              <div className="ci-body">
+                                <div className="ci-text">{c.text}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>
