@@ -272,6 +272,10 @@ function TeacherView() {
   const [todaySubs, setTodaySubs] = React.useState({});
   const [addError, setAddError] = React.useState("");
   const [adding, setAdding] = React.useState(false);
+  const [deleteConfirm, setDeleteConfirm] = React.useState(null);
+  const [studentOrder, setStudentOrder] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('studentOrder') || 'null'); } catch(e) { return null; }
+  });
   const [missionDate, setMissionDate] = React.useState(today());
   const [mathDetail, setMathDetail] = React.useState({});      // {studentId: {wrong_count,wrong_reason,memo,done}}
   const [missionDetail, setMissionDetail] = React.useState({}); // {studentId: {done,comment}}
@@ -287,6 +291,12 @@ function TeacherView() {
 
   const dateKey = today();
   const selected = students.find(s => s.id === selectedId);
+  const orderedStudents = React.useMemo(() => {
+    if (!studentOrder || studentOrder.length === 0) return students;
+    const map = {};
+    studentOrder.forEach((id, i) => map[id] = i);
+    return [...students].sort((a, b) => (map[a.id] ?? 9999) - (map[b.id] ?? 9999));
+  }, [students, studentOrder]);
 
   // 학생 목록 불러오기
   React.useEffect(() => {
@@ -420,6 +430,18 @@ function TeacherView() {
     setExpandedMissionHist(p => ({...p, [studentId]: true}));
   }
 
+  function moveStudent(id, dir) {
+    const list = [...orderedStudents];
+    const idx = list.findIndex(s => s.id === id);
+    if (dir === 'up' && idx === 0) return;
+    if (dir === 'down' && idx === list.length - 1) return;
+    const swap = dir === 'up' ? idx - 1 : idx + 1;
+    [list[idx], list[swap]] = [list[swap], list[idx]];
+    const newOrder = list.map(s => s.id);
+    setStudentOrder(newOrder);
+    localStorage.setItem('studentOrder', JSON.stringify(newOrder));
+  }
+
   async function addStudent() {
     const n = newName.trim(); if (!n) return;
     setAdding(true); setAddError("");
@@ -433,6 +455,11 @@ function TeacherView() {
   async function removeStudent(id) {
     await sb.from("students").delete().eq("id", id);
     setStudents(p => p.filter(s => s.id !== id));
+    setStudentOrder(p => {
+      const newOrder = (p || []).filter(oid => oid !== id);
+      localStorage.setItem('studentOrder', JSON.stringify(newOrder));
+      return newOrder;
+    });
     if (selectedId === id) { setSelectedId(null); setWritings([]); }
   }
 
@@ -521,9 +548,8 @@ function TeacherView() {
         <div className="writings-layout">
           <aside className="writings-sidebar">
             <div className="ws-title">학생 선택</div>
-            {students.map(s => {
+            {orderedStudents.map(s => {
               const sub = todaySubs[s.id] || {};
-              const writingCount = 0; // 성능상 전체 카운트는 선택시만
               return (
                 <div key={s.id} className={`ws-item ${selectedId===s.id?"active":""}`}
                   style={{borderLeft:`4px solid ${s.color}`}} onClick={() => setSelectedId(s.id)}>
@@ -636,8 +662,8 @@ function TeacherView() {
             {/* 수학 현황 */}
             {detailTab === "math" && (
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
-                {students.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
-                {students.map(s => {
+                {orderedStudents.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
+                {orderedStudents.map(s => {
                   const sub = todaySubs[s.id] || {};
                   const md = mathDetail[s.id];
                   const coms = mathComments[s.id] || [];
@@ -716,8 +742,8 @@ function TeacherView() {
             {/* 미션 현황 */}
             {detailTab === "mission" && (
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
-                {students.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
-                {students.map(s => {
+                {orderedStudents.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
+                {orderedStudents.map(s => {
                   const sub = todaySubs[s.id] || {};
                   const md = missionDetail[s.id];
                   const coms = missionComments[s.id] || [];
@@ -799,18 +825,35 @@ function TeacherView() {
                 </div>
                 {addError && <div style={{color:"#e55",fontSize:"13px",background:"#fff0f0",borderRadius:"8px",padding:"8px 12px"}}>{addError}</div>}
                 <div className="student-grid">
-                  {students.map(s => {
+                  {orderedStudents.map((s, idx) => {
                     const sub = todaySubs[s.id] || {};
                     return (
                       <div key={s.id} className="student-card" style={{borderTop:`4px solid ${s.color}`}}>
-                        <div className="sc-name">{s.name}</div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div className="sc-name">{s.name}</div>
+                          <div style={{display:"flex",gap:2}}>
+                            <button onClick={() => moveStudent(s.id, 'up')} disabled={idx===0}
+                              style={{background:"none",border:"1px solid #eee",borderRadius:6,padding:"2px 6px",cursor:"pointer",fontSize:11,color:"#aaa",opacity:idx===0?0.3:1}}>▲</button>
+                            <button onClick={() => moveStudent(s.id, 'down')} disabled={idx===orderedStudents.length-1}
+                              style={{background:"none",border:"1px solid #eee",borderRadius:6,padding:"2px 6px",cursor:"pointer",fontSize:11,color:"#aaa",opacity:idx===orderedStudents.length-1?0.3:1}}>▼</button>
+                          </div>
+                        </div>
                         <div className="sc-today-label">오늘 제출</div>
                         <div className="sc-badges">
                           <span className={`badge ${sub.writing?"on":""}`}>✏️ 글</span>
                           <span className={`badge ${sub.math?"on":""}`}>🔢 수학</span>
                           <span className={`badge ${sub.mission?"on":""}`}>🎯 미션</span>
                         </div>
-                        <button className="del-s-btn" onClick={() => removeStudent(s.id)}>삭제</button>
+                        {deleteConfirm === s.id ? (
+                          <div style={{display:"flex",gap:4,marginTop:4}}>
+                            <button onClick={() => { removeStudent(s.id); setDeleteConfirm(null); }}
+                              style={{flex:1,padding:"4px 0",background:"#e55",color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>삭제</button>
+                            <button onClick={() => setDeleteConfirm(null)}
+                              style={{flex:1,padding:"4px 0",background:"#f0f0f0",color:"#666",border:"none",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>취소</button>
+                          </div>
+                        ) : (
+                          <button className="del-s-btn" onClick={() => setDeleteConfirm(s.id)}>삭제</button>
+                        )}
                       </div>
                     );
                   })}
