@@ -302,6 +302,7 @@ function TeacherView() {
   React.useEffect(() => {
     loadStudents();
     loadMission();
+    loadStudentOrder();
   }, []);
 
   // 학생 선택시 글 불러오기
@@ -344,6 +345,17 @@ function TeacherView() {
   async function loadMissionForDate(date) {
     const { data } = await sb.from("missions").select("*").eq("date", date).maybeSingle();
     setMission(data ? data.content : "");
+  }
+
+  async function loadStudentOrder() {
+    const { data } = await sb.from("missions").select("content").eq("date", "__student_order__").maybeSingle();
+    if (data) {
+      try {
+        const order = JSON.parse(data.content);
+        setStudentOrder(order);
+        localStorage.setItem('studentOrder', JSON.stringify(order));
+      } catch(e) {}
+    }
   }
 
   async function loadStudents() {
@@ -440,6 +452,7 @@ function TeacherView() {
     const newOrder = list.map(s => s.id);
     setStudentOrder(newOrder);
     localStorage.setItem('studentOrder', JSON.stringify(newOrder));
+    sb.from("missions").upsert({ date: "__student_order__", content: JSON.stringify(newOrder) }, { onConflict: "date" });
   }
 
   async function addStudent() {
@@ -886,6 +899,7 @@ function StudentView() {
   const [saved, setSaved] = React.useState({});
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
+  const [studentOrder, setStudentOrderS] = React.useState(null);
   const [allWritings, setAllWritings] = React.useState([]);
   const [allWritingComments, setAllWritingComments] = React.useState({});
   const [showHistory, setShowHistory] = React.useState(false);
@@ -935,6 +949,10 @@ function StudentView() {
   async function loadStudents() {
     const { data } = await sb.from("students").select("*").order("created_at");
     setStudents(data || []);
+    const { data: orderData } = await sb.from("missions").select("content").eq("date", "__student_order__").maybeSingle();
+    if (orderData) {
+      try { setStudentOrderS(JSON.parse(orderData.content)); } catch(e) {}
+    }
     setLoading(false);
   }
 
@@ -1067,12 +1085,10 @@ function StudentView() {
         <div className="ss-title">🌟 내 이름을 찾아요!</div>
         <div className="ss-grid">
           {(() => {
-            try {
-              const order = JSON.parse(localStorage.getItem('studentOrder') || 'null');
-              if (!order) return students;
-              const map = {}; order.forEach((id, i) => map[id] = i);
-              return [...students].sort((a, b) => (map[a.id] ?? 9999) - (map[b.id] ?? 9999));
-            } catch(e) { return students; }
+            const order = studentOrder;
+            if (!order || order.length === 0) return students;
+            const map = {}; order.forEach((id, i) => map[id] = i);
+            return [...students].sort((a, b) => (map[a.id] ?? 9999) - (map[b.id] ?? 9999));
           })().map(s => (
             <button key={s.id} className="ss-card" style={{background:s.color}} onClick={() => setSelectedId(s.id)}>
               <div className="ss-avatar">{s.name[0]}</div>
