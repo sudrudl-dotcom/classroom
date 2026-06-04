@@ -280,6 +280,10 @@ function TeacherView() {
   const [mathCommentDraft, setMathCommentDraft] = React.useState({});
   const [missionCommentDraft, setMissionCommentDraft] = React.useState({});
   const [detailTab, setDetailTab] = React.useState("math");
+  const [expandedMathHist, setExpandedMathHist] = React.useState({});
+  const [mathHist, setMathHist] = React.useState({});
+  const [expandedMissionHist, setExpandedMissionHist] = React.useState({});
+  const [missionHist, setMissionHist] = React.useState({});
 
   const dateKey = today();
   const selected = students.find(s => s.id === selectedId);
@@ -394,6 +398,26 @@ function TeacherView() {
     (mscData||[]).forEach(c => { if(!msc[c.student_id]) msc[c.student_id]=[]; msc[c.student_id].push(c); });
     setMathComments(mc);
     setMissionComments(msc);
+  }
+
+  async function toggleMathHist(studentId) {
+    if (expandedMathHist[studentId]) {
+      setExpandedMathHist(p => ({...p, [studentId]: false}));
+      return;
+    }
+    const { data } = await sb.from("maths").select("*").eq("student_id", studentId).order("date", {ascending: false});
+    setMathHist(p => ({...p, [studentId]: data || []}));
+    setExpandedMathHist(p => ({...p, [studentId]: true}));
+  }
+
+  async function toggleMissionHist(studentId) {
+    if (expandedMissionHist[studentId]) {
+      setExpandedMissionHist(p => ({...p, [studentId]: false}));
+      return;
+    }
+    const { data } = await sb.from("mission_submissions").select("*").eq("student_id", studentId).order("date", {ascending: false});
+    setMissionHist(p => ({...p, [studentId]: data || []}));
+    setExpandedMissionHist(p => ({...p, [studentId]: true}));
   }
 
   async function addStudent() {
@@ -663,6 +687,26 @@ function TeacherView() {
                           </button>
                         </div>
                       </div>
+
+                      {/* 지난 수학 기록 */}
+                      <button onClick={() => toggleMathHist(s.id)}
+                        style={{marginTop:10,background:"none",border:"1.5px solid #eee",borderRadius:16,padding:"6px 16px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#aaa",width:"100%"}}>
+                        {expandedMathHist[s.id] ? "▲ 지난 기록 접기" : "▼ 지난 기록 보기"}
+                      </button>
+                      {expandedMathHist[s.id] && (mathHist[s.id]||[]).filter(m => m.date !== dateKey).length === 0 && (
+                        <div style={{fontSize:12,color:"#ccc",textAlign:"center",padding:"8px 0"}}>지난 기록이 없어요</div>
+                      )}
+                      {expandedMathHist[s.id] && (mathHist[s.id]||[]).filter(m => m.date !== dateKey).map(m => (
+                        <div key={m.date} style={{background:"#f7f5f0",borderRadius:12,padding:"12px 14px",marginTop:8}}>
+                          <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginBottom:6}}>{m.date}</div>
+                          <div style={{fontSize:13,color:"#555"}}>
+                            틀린 문제 <b>{m.wrong_count}개</b>
+                            {m.wrong_reason && <span style={{marginLeft:6,background:"#e8e8e8",borderRadius:6,padding:"1px 8px",fontSize:12}}>{m.wrong_reason}</span>}
+                            <span style={{marginLeft:6,background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#bbb",borderRadius:6,padding:"1px 7px",fontSize:11}}>{m.done?"✓완료":"미완료"}</span>
+                          </div>
+                          {m.memo && <div style={{fontSize:13,color:"#444",marginTop:6,lineHeight:1.6}}>💬 {m.memo}</div>}
+                        </div>
+                      ))}
                     </div>
                   );
                 })}
@@ -720,6 +764,22 @@ function TeacherView() {
                           </button>
                         </div>
                       </div>
+
+                      {/* 지난 미션 기록 */}
+                      <button onClick={() => toggleMissionHist(s.id)}
+                        style={{marginTop:10,background:"none",border:"1.5px solid #eee",borderRadius:16,padding:"6px 16px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#aaa",width:"100%"}}>
+                        {expandedMissionHist[s.id] ? "▲ 지난 기록 접기" : "▼ 지난 기록 보기"}
+                      </button>
+                      {expandedMissionHist[s.id] && (missionHist[s.id]||[]).filter(m => m.date !== dateKey).length === 0 && (
+                        <div style={{fontSize:12,color:"#ccc",textAlign:"center",padding:"8px 0"}}>지난 기록이 없어요</div>
+                      )}
+                      {expandedMissionHist[s.id] && (missionHist[s.id]||[]).filter(m => m.date !== dateKey).map(m => (
+                        <div key={m.date} style={{background:"#f7f5f0",borderRadius:12,padding:"12px 14px",marginTop:8}}>
+                          <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginBottom:6}}>{m.date}</div>
+                          <span style={{background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#bbb",borderRadius:6,padding:"2px 9px",fontSize:12}}>{m.done?"✓ 완료":"미완료"}</span>
+                          {m.comment && <div style={{fontSize:13,color:"#444",marginTop:6,lineHeight:1.6}}>💬 {m.comment}</div>}
+                        </div>
+                      ))}
                     </div>
                   );
                 })}
@@ -786,6 +846,12 @@ function StudentView() {
   const [allWritings, setAllWritings] = React.useState([]);
   const [allWritingComments, setAllWritingComments] = React.useState({});
   const [showHistory, setShowHistory] = React.useState(false);
+  const [allMaths, setAllMaths] = React.useState([]);
+  const [mathHistComments, setMathHistComments] = React.useState({});
+  const [showMathHistory, setShowMathHistory] = React.useState(false);
+  const [allMissions, setAllMissions] = React.useState([]);
+  const [missionHistComments, setMissionHistComments] = React.useState({});
+  const [showMissionHistory, setShowMissionHistory] = React.useState(false);
 
   const WRONG_REASONS = ["계산 실수","개념 이해 부족","문제를 잘못 읽음","풀이 방법 모름","시간 부족","기타"];
   const dateKey = today();
@@ -803,6 +869,8 @@ function StudentView() {
     loadMyComments();
     loadNotifications();
     loadAllWritings();
+    loadAllMaths();
+    loadAllMissions();
     // 실시간 알림 구독
     const channel = sb.channel(`student-${selectedId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications',
@@ -825,6 +893,38 @@ function StudentView() {
     const { data } = await sb.from("students").select("*").order("created_at");
     setStudents(data || []);
     setLoading(false);
+  }
+
+  async function loadAllMaths() {
+    const { data } = await sb.from("maths").select("*").eq("student_id", selectedId).order("date", {ascending: false});
+    setAllMaths(data || []);
+    const pastDates = (data||[]).filter(m => m.date !== dateKey).map(m => "math_" + m.date);
+    if (pastDates.length > 0) {
+      const { data: cData } = await sb.from("comments").select("*").eq("student_id", selectedId).in("date", pastDates).order("created_at");
+      const grouped = {};
+      (cData||[]).forEach(c => {
+        const d = c.date.replace("math_", "");
+        if (!grouped[d]) grouped[d] = [];
+        grouped[d].push(c);
+      });
+      setMathHistComments(grouped);
+    }
+  }
+
+  async function loadAllMissions() {
+    const { data } = await sb.from("mission_submissions").select("*").eq("student_id", selectedId).order("date", {ascending: false});
+    setAllMissions(data || []);
+    const pastDates = (data||[]).filter(m => m.date !== dateKey).map(m => "mission_" + m.date);
+    if (pastDates.length > 0) {
+      const { data: cData } = await sb.from("comments").select("*").eq("student_id", selectedId).in("date", pastDates).order("created_at");
+      const grouped = {};
+      (cData||[]).forEach(c => {
+        const d = c.date.replace("mission_", "");
+        if (!grouped[d]) grouped[d] = [];
+        grouped[d].push(c);
+      });
+      setMissionHistComments(grouped);
+    }
   }
 
   async function loadAllWritings() {
@@ -1099,6 +1199,40 @@ function StudentView() {
                 ))}
               </div>
             )}
+
+            {/* 지난 수학 기록 */}
+            {allMaths.filter(m => m.date !== dateKey).length > 0 && (
+              <div>
+                <button onClick={() => setShowMathHistory(h => !h)}
+                  style={{background:"none",border:"1.5px solid #ddd",borderRadius:20,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#666",width:"100%",marginTop:8}}>
+                  {showMathHistory ? "▲ 지난 기록 접기" : `▼ 지난 수학 기록 (${allMaths.filter(m=>m.date!==dateKey).length}개)`}
+                </button>
+                {showMathHistory && allMaths.filter(m => m.date !== dateKey).map(m => {
+                  const coms = mathHistComments[m.date] || [];
+                  return (
+                    <article key={m.date} className="entry-card" style={{marginTop:12}}>
+                      <div className="ec-date">{m.date}</div>
+                      <div style={{fontSize:14,color:"#555",margin:"8px 0"}}>
+                        틀린 문제 <b>{m.wrong_count}개</b>
+                        {m.wrong_reason && <span style={{marginLeft:8,background:"#f0f0f0",borderRadius:8,padding:"2px 10px",fontSize:13}}>{m.wrong_reason}</span>}
+                        <span style={{marginLeft:8,background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#aaa",borderRadius:8,padding:"2px 8px",fontSize:12}}>{m.done?"✓ 완료":"미완료"}</span>
+                      </div>
+                      {m.memo && <div style={{fontSize:14,color:"#333",background:"#f7f5f0",borderRadius:10,padding:"8px 12px"}}>💬 {m.memo}</div>}
+                      {coms.length > 0 && (
+                        <div className="comment-list">
+                          {coms.map(c => (
+                            <div key={c.id} className="comment-item">
+                              <div className="ci-avatar">선생님</div>
+                              <div className="ci-body"><div className="ci-text">{c.text}</div></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1131,6 +1265,38 @@ function StudentView() {
                     <div className="scp-text">{c.text}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* 지난 미션 기록 */}
+            {allMissions.filter(m => m.date !== dateKey).length > 0 && (
+              <div>
+                <button onClick={() => setShowMissionHistory(h => !h)}
+                  style={{background:"none",border:"1.5px solid #ddd",borderRadius:20,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#666",width:"100%",marginTop:8}}>
+                  {showMissionHistory ? "▲ 지난 기록 접기" : `▼ 지난 미션 기록 (${allMissions.filter(m=>m.date!==dateKey).length}개)`}
+                </button>
+                {showMissionHistory && allMissions.filter(m => m.date !== dateKey).map(m => {
+                  const coms = missionHistComments[m.date] || [];
+                  return (
+                    <article key={m.date} className="entry-card" style={{marginTop:12}}>
+                      <div className="ec-date">{m.date}</div>
+                      <div style={{marginBottom:8}}>
+                        <span style={{background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#aaa",borderRadius:8,padding:"3px 10px",fontSize:13,fontWeight:700}}>{m.done?"✓ 완료":"미완료"}</span>
+                      </div>
+                      {m.comment && <div style={{fontSize:14,color:"#333",background:"#f7f5f0",borderRadius:10,padding:"8px 12px"}}>💬 {m.comment}</div>}
+                      {coms.length > 0 && (
+                        <div className="comment-list">
+                          {coms.map(c => (
+                            <div key={c.id} className="comment-item">
+                              <div className="ci-avatar">선생님</div>
+                              <div className="ci-body"><div className="ci-text">{c.text}</div></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>
