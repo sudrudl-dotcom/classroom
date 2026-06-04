@@ -355,6 +355,15 @@ function TeacherView() {
         setStudentOrder(order);
         localStorage.setItem('studentOrder', JSON.stringify(order));
       } catch(e) {}
+    } else {
+      // Supabase에 없으면 localStorage에서 읽어서 자동 저장
+      try {
+        const localOrder = JSON.parse(localStorage.getItem('studentOrder') || 'null');
+        if (localOrder && localOrder.length > 0) {
+          setStudentOrder(localOrder);
+          await sb.from("missions").upsert({ date: "__student_order__", content: JSON.stringify(localOrder) }, { onConflict: "date" });
+        }
+      } catch(e) {}
     }
   }
 
