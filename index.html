@@ -1066,7 +1066,14 @@ function StudentView() {
       <div className="student-select-wrap">
         <div className="ss-title">🌟 내 이름을 찾아요!</div>
         <div className="ss-grid">
-          {students.map(s => (
+          {(() => {
+            try {
+              const order = JSON.parse(localStorage.getItem('studentOrder') || 'null');
+              if (!order) return students;
+              const map = {}; order.forEach((id, i) => map[id] = i);
+              return [...students].sort((a, b) => (map[a.id] ?? 9999) - (map[b.id] ?? 9999));
+            } catch(e) { return students; }
+          })().map(s => (
             <button key={s.id} className="ss-card" style={{background:s.color}} onClick={() => setSelectedId(s.id)}>
               <div className="ss-avatar">{s.name[0]}</div>
               <div className="ss-card-name">{s.name}</div>
