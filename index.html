@@ -423,21 +423,32 @@ function TeacherView() {
     if (selectedId === id) { setSelectedId(null); setWritings([]); }
   }
 
-  const dragRef = React.useRef(null);
+  const dragSrcId = React.useRef(null);
+  const [dragOverId, setDragOverId] = React.useState(null);
 
-  async function onDrop(targetId) {
-    const fromId = dragRef.current;
-    if (!fromId || fromId === targetId) return;
+  async function doReorder(fromId, toId) {
+    if (!fromId || !toId || fromId === toId) return;
     const fromIdx = students.findIndex(s => s.id === fromId);
-    const toIdx   = students.findIndex(s => s.id === targetId);
+    const toIdx   = students.findIndex(s => s.id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
     const reordered = [...students];
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
     const withOrder = reordered.map((s, i) => ({ ...s, sort_order: i + 1 }));
     setStudents(withOrder);
+    setDragOverId(null);
+    dragSrcId.current = null;
     await Promise.all(withOrder.map(s =>
       sb.from("students").update({ sort_order: s.sort_order }).eq("id", s.id)
     ));
+  }
+
+  function onTouchMove(e) {
+    e.preventDefault();
+    const t = e.touches[0];
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    const card = el && el.closest('[data-sid]');
+    if (card) setDragOverId(card.getAttribute('data-sid'));
   }
 
   async function saveMission() {
@@ -768,14 +779,24 @@ function TeacherView() {
                     const sub = todaySubs[s.id] || {};
                     return (
                       <div key={s.id} className="student-card"
+                        data-sid={s.id}
                         draggable
-                        onDragStart={() => { dragRef.current = s.id; }}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={() => onDrop(s.id)}
-                        style={{borderTop:`4px solid ${s.color}`, cursor:"grab", opacity:1}}>
+                        onDragStart={() => { dragSrcId.current = s.id; }}
+                        onDragOver={e => { e.preventDefault(); setDragOverId(s.id); }}
+                        onDragLeave={() => setDragOverId(null)}
+                        onDrop={() => doReorder(dragSrcId.current, s.id)}
+                        onDragEnd={() => setDragOverId(null)}
+                        onTouchStart={() => { dragSrcId.current = s.id; }}
+                        onTouchMove={onTouchMove}
+                        onTouchEnd={() => doReorder(dragSrcId.current, dragOverId)}
+                        style={{borderTop:`4px solid ${s.color}`, cursor:"grab",
+                          opacity: dragSrcId.current === s.id ? 0.4 : 1,
+                          background: dragOverId === s.id ? "#f0f7f0" : "#fff",
+                          transform: dragOverId === s.id ? "scale(1.03)" : "scale(1)",
+                          transition:"transform .15s,background .15s"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <div className="sc-name">{s.name}</div>
-                          <span style={{fontSize:14,color:"#ccc",userSelect:"none"}}>⠿</span>
+                          <span style={{fontSize:16,color:"#bbb",userSelect:"none"}}>⠿</span>
                         </div>
                         <div className="sc-today-label">오늘 제출</div>
                         <div className="sc-badges">
