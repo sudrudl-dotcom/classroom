@@ -126,8 +126,8 @@ body{background:#f7f5f0;font-family:'Noto Sans KR',sans-serif;-webkit-tap-highli
 .ss-card-name{font-size:14px;font-weight:700;color:#fff}
 .empty-msg{color:#bbb;font-size:15px;text-align:center;padding:40px}
 
-.notif-banner{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#e07b6a;color:#fff;padding:10px 28px;border-radius:20px;font-size:14px;font-weight:700;z-index:200;cursor:pointer;box-shadow:0 4px 16px rgba(224,123,106,.4);animation:slidein .3s ease;white-space:nowrap}
-@keyframes slidein{from{top:50px;opacity:0}to{top:68px;opacity:1}}
+.notif-banner{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#e07b6a;color:#fff;padding:12px 28px;border-radius:24px;font-size:14px;font-weight:700;z-index:200;cursor:pointer;box-shadow:0 4px 20px rgba(224,123,106,.5);animation:slidein .3s ease;white-space:nowrap}
+@keyframes slidein{from{bottom:0;opacity:0}to{bottom:24px;opacity:1}}
 .notif-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:300}
 .notif-modal{background:#fff;border-radius:20px;padding:28px;max-width:380px;width:90%;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .nm-title{font-family:'Gaegu',cursive;font-size:24px;color:#2d3a2e}
@@ -186,33 +186,50 @@ body{background:#f7f5f0;font-family:'Noto Sans KR',sans-serif;-webkit-tap-highli
 
 /* 모바일 */
 @media(max-width:600px){
-  .landing-title{font-size:38px}
+  .landing-title{font-size:34px}
+  .landing-emoji{font-size:52px}
   .land-btn{width:120px;padding:22px 12px}
   .t-header{padding:0 8px;gap:8px;height:52px}
   .t-logo{display:none}
-  .t-nav-btn{padding:6px 10px;font-size:12px}
+  .t-nav-btn{padding:6px 8px;font-size:11px}
   .writings-layout{flex-direction:column;height:auto;min-height:100vh}
   .writings-sidebar{width:100%;height:auto;border-right:none;border-bottom:1px solid #eee;padding:8px 0;display:flex;flex-direction:row;overflow-x:auto;overflow-y:hidden}
   .ws-title{display:none}
   .ws-item{flex-direction:column;align-items:center;padding:8px 14px;min-width:60px;border-left:none !important;border-bottom:3px solid transparent;white-space:nowrap;gap:4px}
   .ws-item.active{background:#f0f7f0;border-bottom:3px solid #4a7a4e}
-  .writings-main{padding:16px}
+  .writings-main{padding:12px}
   .wm-header{flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px}
-  .wm-name{font-size:26px}
-  .entry-card{padding:18px 16px}
-  .ec-title{font-size:20px}
-  .t-content{padding:16px}
+  .wm-name{font-size:24px}
+  .entry-card{padding:16px 14px}
+  .ec-title{font-size:19px}
+  .ec-content{font-size:14px;line-height:1.9}
+  .t-content{padding:12px}
   .mission-edit,.add-row{flex-direction:column}
   .mission-save-btn,.add-confirm-btn{width:100%}
-  .ss-title{font-size:30px}
-  .ss-card{width:84px;height:100px}
-  .s-tab-btn{font-size:11px;padding:12px 4px}
+  .student-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+  .student-card{padding:12px}
+  .ss-title{font-size:28px}
+  .ss-card{width:80px;height:96px}
+  .ss-avatar{width:38px;height:38px;font-size:18px}
+  .ss-card-name{font-size:12px}
+  .s-header{height:50px;padding:0 14px}
+  .s-header-name{font-size:19px}
+  .s-tabs{top:50px}
+  .s-tab-btn{font-size:11px;padding:11px 4px}
+  .s-body{padding:16px 14px;gap:12px}
   .np-redline{display:none}
   .np-title-input{padding:0 0 12px 0;font-size:20px}
   .np-content{padding:0;font-size:14px;line-height:28px}
-  .notif-banner{width:90%;text-align:center;font-size:13px;padding:10px 16px}
+  .notebook-paper{padding:18px 16px 12px;background-position:0 38px}
+  .notif-banner{width:88%;text-align:center;font-size:13px;padding:10px 14px;bottom:16px}
   .wc-btn{width:44px;height:44px;font-size:12px}
-  .reason-grid{grid-template-columns:1fr}
+  .reason-grid{grid-template-columns:1fr 1fr}
+  .math-card{padding:16px}
+  .mission-banner{padding:16px}
+  .done-btn{padding:14px;font-size:14px}
+  .submit-btn{padding:14px;font-size:15px}
+  .comment-item{gap:8px}
+  .notif-modal{padding:20px;max-width:340px}
 }
 
   </style>
@@ -406,20 +423,21 @@ function TeacherView() {
     if (selectedId === id) { setSelectedId(null); setWritings([]); }
   }
 
-  async function moveStudent(id, dir) {
-    const idx = students.findIndex(s => s.id === id);
-    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= students.length) return;
-    const a = students[idx], b = students[swapIdx];
-    const orderA = a.sort_order ?? idx;
-    const orderB = b.sort_order ?? swapIdx;
-    await sb.from("students").update({ sort_order: orderB }).eq("id", a.id);
-    await sb.from("students").update({ sort_order: orderA }).eq("id", b.id);
-    const updated = [...students];
-    updated[idx] = { ...a, sort_order: orderB };
-    updated[swapIdx] = { ...b, sort_order: orderA };
-    updated.sort((x, y) => (x.sort_order ?? 999) - (y.sort_order ?? 999));
-    setStudents(updated);
+  const dragRef = React.useRef(null);
+
+  async function onDrop(targetId) {
+    const fromId = dragRef.current;
+    if (!fromId || fromId === targetId) return;
+    const fromIdx = students.findIndex(s => s.id === fromId);
+    const toIdx   = students.findIndex(s => s.id === targetId);
+    const reordered = [...students];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    const withOrder = reordered.map((s, i) => ({ ...s, sort_order: i + 1 }));
+    setStudents(withOrder);
+    await Promise.all(withOrder.map(s =>
+      sb.from("students").update({ sort_order: s.sort_order }).eq("id", s.id)
+    ));
   }
 
   async function saveMission() {
@@ -749,15 +767,15 @@ function TeacherView() {
                   {students.map((s, i) => {
                     const sub = todaySubs[s.id] || {};
                     return (
-                      <div key={s.id} className="student-card" style={{borderTop:`4px solid ${s.color}`}}>
+                      <div key={s.id} className="student-card"
+                        draggable
+                        onDragStart={() => { dragRef.current = s.id; }}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={() => onDrop(s.id)}
+                        style={{borderTop:`4px solid ${s.color}`, cursor:"grab", opacity:1}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <div className="sc-name">{s.name}</div>
-                          <div style={{display:"flex",gap:2}}>
-                            <button onClick={()=>moveStudent(s.id,"up")} disabled={i===0}
-                              style={{background:"none",border:"1px solid #e0e0e0",borderRadius:6,width:22,height:22,cursor:"pointer",fontSize:11,color:"#aaa",padding:0,lineHeight:1,opacity:i===0?0.3:1}}>▲</button>
-                            <button onClick={()=>moveStudent(s.id,"down")} disabled={i===students.length-1}
-                              style={{background:"none",border:"1px solid #e0e0e0",borderRadius:6,width:22,height:22,cursor:"pointer",fontSize:11,color:"#aaa",padding:0,lineHeight:1,opacity:i===students.length-1?0.3:1}}>▼</button>
-                          </div>
+                          <span style={{fontSize:14,color:"#ccc",userSelect:"none"}}>⠿</span>
                         </div>
                         <div className="sc-today-label">오늘 제출</div>
                         <div className="sc-badges">
