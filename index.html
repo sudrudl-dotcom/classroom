@@ -294,6 +294,9 @@ function TeacherView() {
   const [todaySubs, setTodaySubs] = React.useState({});
   const [addError, setAddError] = React.useState("");
   const [adding, setAdding] = React.useState(false);
+  const [editClassName, setEditClassName] = React.useState(classConfig?.class_name || "");
+  const [editEmoji, setEditEmoji] = React.useState(classConfig?.emoji || "📚");
+  const [classSaving, setClassSaving] = React.useState(false);
   const [mathDetail, setMathDetail] = React.useState({});      // {studentId: {wrong_count,wrong_reason,memo,done}}
   const [missionDetail, setMissionDetail] = React.useState({}); // {studentId: {done,comment}}
   const [mathComments, setMathComments] = React.useState({});   // {studentId: [comments]}
@@ -416,6 +419,17 @@ function TeacherView() {
     setAdding(false);
     if (error) { setAddError("등록 실패: " + (error.message || error.code || JSON.stringify(error))); return; }
     if (data) { setStudents(p => [...p, data]); setNewName(""); }
+  }
+
+  async function saveClassConfig() {
+    setClassSaving(true);
+    await sb.from("classrooms").update({
+      class_name: editClassName.trim() || classConfig.class_name,
+      emoji: editEmoji.trim() || "📚"
+    }).eq("class_id", CLASS_ID);
+    setClassSaving(false);
+    // 즉시 반영 - 페이지 새로고침
+    window.location.reload();
   }
 
   async function removeStudent(id) {
@@ -766,6 +780,22 @@ function TeacherView() {
             {/* 학생 관리 */}
             {detailTab === "manage" && (
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
+
+                {/* 반 설정 */}
+                <div style={{background:"#f7f7f5",borderRadius:14,padding:16,display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#888"}}>반 설정</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input placeholder="이모지" value={editEmoji} onChange={e=>setEditEmoji(e.target.value)}
+                      style={{width:64,padding:"10px 12px",borderRadius:10,border:"2px solid #ddd",fontSize:20,textAlign:"center",outline:"none"}}/>
+                    <input placeholder="반 이름" value={editClassName} onChange={e=>setEditClassName(e.target.value)}
+                      style={{flex:1,padding:"10px 14px",borderRadius:10,border:"2px solid #ddd",fontSize:15,fontFamily:"'Noto Sans KR',sans-serif",outline:"none"}}/>
+                    <button onClick={saveClassConfig} disabled={classSaving}
+                      style={{padding:"10px 16px",background:"#2d3a2e",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Noto Sans KR',sans-serif",whiteSpace:"nowrap",opacity:classSaving?0.5:1}}>
+                      {classSaving?"저장중":"저장"}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="add-row">
                   <input className="add-input" placeholder="학생 이름 입력 후 엔터" value={newName}
                     onChange={e => { setNewName(e.target.value); setAddError(""); }}
@@ -1324,7 +1354,7 @@ function App() {
   if (!mode) return (
     <div className="landing">
       <div className="landing-inner">
-        <div className="landing-emoji">📚</div>
+        <div className="landing-emoji">{classConfig.emoji || "📚"}</div>
         <h1 className="landing-title">{CLASS_NAME}</h1>
         <p className="landing-sub">누구세요?</p>
         <div className="landing-btns">
