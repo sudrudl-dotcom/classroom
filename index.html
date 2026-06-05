@@ -279,7 +279,7 @@ function Spinner() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TEACHER VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
-function TeacherView() {
+function TeacherView({ classConfig }) {
   const [tab, setTab] = React.useState("writings");
   const [students, setStudents] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
@@ -1397,7 +1397,7 @@ function App() {
       <div className="mode-switch">
         <button className="mode-back-btn" onClick={() => setMode(null)}>← 처음으로</button>
       </div>
-      {mode === "teacher" ? <TeacherView/> : <StudentView/>}
+      {mode === "teacher" ? <TeacherView classConfig={classConfig}/> : <StudentView/>}
     </div>
   );
 }
