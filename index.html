@@ -279,7 +279,7 @@ function Spinner() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TEACHER VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
-function TeacherView({ classConfig }) {
+function TeacherView() {
   const [tab, setTab] = React.useState("writings");
   const [students, setStudents] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
@@ -294,8 +294,8 @@ function TeacherView({ classConfig }) {
   const [todaySubs, setTodaySubs] = React.useState({});
   const [addError, setAddError] = React.useState("");
   const [adding, setAdding] = React.useState(false);
-  const [editClassName, setEditClassName] = React.useState(classConfig?.class_name || "");
-  const [editEmoji, setEditEmoji] = React.useState(classConfig?.emoji || "📚");
+  const [editClassName, setEditClassName] = React.useState("");
+  const [editEmoji, setEditEmoji] = React.useState("📚");
   const [classSaving, setClassSaving] = React.useState(false);
   const [mathDetail, setMathDetail] = React.useState({});      // {studentId: {wrong_count,wrong_reason,memo,done}}
   const [missionDetail, setMissionDetail] = React.useState({}); // {studentId: {done,comment}}
@@ -311,6 +311,7 @@ function TeacherView({ classConfig }) {
   // 학생 목록 불러오기
   React.useEffect(() => {
     loadStudents();
+    loadClassSettings();
     loadMission();
   }, []);
 
@@ -345,6 +346,11 @@ function TeacherView({ classConfig }) {
     return () => sb.removeChannel(channel);
   }, [selectedId]);
 
+
+  async function loadClassSettings() {
+    const { data } = await sb.from("classrooms").select("*").eq("class_id", CLASS_ID).maybeSingle();
+    if (data) { setEditClassName(data.class_name || ""); setEditEmoji(data.emoji || "📚"); }
+  }
 
   async function loadStudents() {
     setLoading(true);
@@ -424,7 +430,7 @@ function TeacherView({ classConfig }) {
   async function saveClassConfig() {
     setClassSaving(true);
     await sb.from("classrooms").update({
-      class_name: editClassName.trim() || classConfig.class_name,
+      class_name: editClassName.trim() || "우리 교실",
       emoji: editEmoji.trim() || "📚"
     }).eq("class_id", CLASS_ID);
     setClassSaving(false);
@@ -1397,7 +1403,7 @@ function App() {
       <div className="mode-switch">
         <button className="mode-back-btn" onClick={() => setMode(null)}>← 처음으로</button>
       </div>
-      {mode === "teacher" ? <TeacherView classConfig={classConfig}/> : <StudentView/>}
+      {mode === "teacher" ? <TeacherView/> : <StudentView/>}
     </div>
   );
 }
