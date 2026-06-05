@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>행운의 반</title>
+  <title>우리 교실</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -225,6 +225,10 @@ const SUPABASE_URL = "https://igyahhjpkqahdwfeccao.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlneWFoaGpwa3FhaGR3ZmVjY2FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5ODk4NTQsImV4cCI6MjA5NTU2NTg1NH0.8tAoPtTOBsaRYSt2_JP9ZD1eDwH5CHlTX74TE5oWv2c";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ─── 반(클래스) 구분 ───────────────────────────────────────────────────────────
+const PARAMS = new URLSearchParams(window.location.search);
+const CLASS_ID = (PARAMS.get('class') || 'hagun').trim();
+
 const COLORS = ["#E07B6A","#E09B50","#C9B84C","#5B9E8F","#5A8FC2","#8B7CC8","#C26E9A"];
 
 function today() {
@@ -272,11 +276,6 @@ function TeacherView() {
   const [todaySubs, setTodaySubs] = React.useState({});
   const [addError, setAddError] = React.useState("");
   const [adding, setAdding] = React.useState(false);
-  const [deleteConfirm, setDeleteConfirm] = React.useState(null);
-  const [studentOrder, setStudentOrder] = React.useState(() => {
-    try { return JSON.parse(localStorage.getItem('studentOrder') || 'null'); } catch(e) { return null; }
-  });
-  const [missionDate, setMissionDate] = React.useState(today());
   const [mathDetail, setMathDetail] = React.useState({});      // {studentId: {wrong_count,wrong_reason,memo,done}}
   const [missionDetail, setMissionDetail] = React.useState({}); // {studentId: {done,comment}}
   const [mathComments, setMathComments] = React.useState({});   // {studentId: [comments]}
@@ -284,25 +283,14 @@ function TeacherView() {
   const [mathCommentDraft, setMathCommentDraft] = React.useState({});
   const [missionCommentDraft, setMissionCommentDraft] = React.useState({});
   const [detailTab, setDetailTab] = React.useState("math");
-  const [expandedMathHist, setExpandedMathHist] = React.useState({});
-  const [mathHist, setMathHist] = React.useState({});
-  const [expandedMissionHist, setExpandedMissionHist] = React.useState({});
-  const [missionHist, setMissionHist] = React.useState({});
 
   const dateKey = today();
   const selected = students.find(s => s.id === selectedId);
-  const orderedStudents = React.useMemo(() => {
-    if (!studentOrder || studentOrder.length === 0) return students;
-    const map = {};
-    studentOrder.forEach((id, i) => map[id] = i);
-    return [...students].sort((a, b) => (map[a.id] ?? 9999) - (map[b.id] ?? 9999));
-  }, [students, studentOrder]);
 
   // 학생 목록 불러오기
   React.useEffect(() => {
     loadStudents();
     loadMission();
-    loadStudentOrder();
   }, []);
 
   // 학생 선택시 글 불러오기
@@ -337,45 +325,15 @@ function TeacherView() {
   }, [selectedId]);
 
 
-  // 날짜 바뀔 때 해당 날짜 미션 로드
-  React.useEffect(() => {
-    loadMissionForDate(missionDate);
-  }, [missionDate]);
-
-  async function loadMissionForDate(date) {
-    const { data } = await sb.from("missions").select("*").eq("date", date).maybeSingle();
-    setMission(data ? data.content : "");
-  }
-
-  async function loadStudentOrder() {
-    const { data } = await sb.from("missions").select("content").eq("date", "__student_order__").maybeSingle();
-    if (data) {
-      try {
-        const order = JSON.parse(data.content);
-        setStudentOrder(order);
-        localStorage.setItem('studentOrder', JSON.stringify(order));
-      } catch(e) {}
-    } else {
-      // Supabase에 없으면 localStorage에서 읽어서 자동 저장
-      try {
-        const localOrder = JSON.parse(localStorage.getItem('studentOrder') || 'null');
-        if (localOrder && localOrder.length > 0) {
-          setStudentOrder(localOrder);
-          await sb.from("missions").upsert({ date: "__student_order__", content: JSON.stringify(localOrder) }, { onConflict: "date" });
-        }
-      } catch(e) {}
-    }
-  }
-
   async function loadStudents() {
     setLoading(true);
-    const { data } = await sb.from("students").select("*").order("created_at");
+    const { data } = await sb.from("students").select("*").eq("class_id", CLASS_ID).order("created_at");
     setStudents(data || []);
     setLoading(false);
   }
 
   async function loadMission() {
-    const { data } = await sb.from("missions").select("*").eq("date", today()).maybeSingle();
+    const { data } = await sb.from("missions").select("*").eq("date", today()).eq("class_id", CLASS_ID).maybeSingle();
     if (data) setMission(data.content);
   }
 
@@ -431,44 +389,11 @@ function TeacherView() {
     setMissionComments(msc);
   }
 
-  async function toggleMathHist(studentId) {
-    if (expandedMathHist[studentId]) {
-      setExpandedMathHist(p => ({...p, [studentId]: false}));
-      return;
-    }
-    const { data } = await sb.from("maths").select("*").eq("student_id", studentId).order("date", {ascending: false});
-    setMathHist(p => ({...p, [studentId]: data || []}));
-    setExpandedMathHist(p => ({...p, [studentId]: true}));
-  }
-
-  async function toggleMissionHist(studentId) {
-    if (expandedMissionHist[studentId]) {
-      setExpandedMissionHist(p => ({...p, [studentId]: false}));
-      return;
-    }
-    const { data } = await sb.from("mission_submissions").select("*").eq("student_id", studentId).order("date", {ascending: false});
-    setMissionHist(p => ({...p, [studentId]: data || []}));
-    setExpandedMissionHist(p => ({...p, [studentId]: true}));
-  }
-
-  function moveStudent(id, dir) {
-    const list = [...orderedStudents];
-    const idx = list.findIndex(s => s.id === id);
-    if (dir === 'up' && idx === 0) return;
-    if (dir === 'down' && idx === list.length - 1) return;
-    const swap = dir === 'up' ? idx - 1 : idx + 1;
-    [list[idx], list[swap]] = [list[swap], list[idx]];
-    const newOrder = list.map(s => s.id);
-    setStudentOrder(newOrder);
-    localStorage.setItem('studentOrder', JSON.stringify(newOrder));
-    sb.from("missions").upsert({ date: "__student_order__", content: JSON.stringify(newOrder) }, { onConflict: "date" });
-  }
-
   async function addStudent() {
     const n = newName.trim(); if (!n) return;
     setAdding(true); setAddError("");
     const color = COLORS[students.length % COLORS.length];
-    const { data, error } = await sb.from("students").insert({ name: n, color }).select().single();
+    const { data, error } = await sb.from("students").insert({ name: n, color, class_id: CLASS_ID }).select().single();
     setAdding(false);
     if (error) { setAddError("등록 실패: " + (error.message || error.code || JSON.stringify(error))); return; }
     if (data) { setStudents(p => [...p, data]); setNewName(""); }
@@ -477,16 +402,11 @@ function TeacherView() {
   async function removeStudent(id) {
     await sb.from("students").delete().eq("id", id);
     setStudents(p => p.filter(s => s.id !== id));
-    setStudentOrder(p => {
-      const newOrder = (p || []).filter(oid => oid !== id);
-      localStorage.setItem('studentOrder', JSON.stringify(newOrder));
-      return newOrder;
-    });
     if (selectedId === id) { setSelectedId(null); setWritings([]); }
   }
 
   async function saveMission() {
-    const { error } = await sb.from("missions").upsert({ content: mission, date: missionDate }, { onConflict: "date" });
+    const { error } = await sb.from("missions").upsert({ content: mission, date: dateKey, class_id: CLASS_ID }, { onConflict: "date,class_id" });
     if (error) { alert("미션 저장 실패: " + error.message); return; }
     setMissionSaved(true); setTimeout(() => setMissionSaved(false), 1500);
   }
@@ -570,8 +490,9 @@ function TeacherView() {
         <div className="writings-layout">
           <aside className="writings-sidebar">
             <div className="ws-title">학생 선택</div>
-            {orderedStudents.map(s => {
+            {students.map(s => {
               const sub = todaySubs[s.id] || {};
+              const writingCount = 0; // 성능상 전체 카운트는 선택시만
               return (
                 <div key={s.id} className={`ws-item ${selectedId===s.id?"active":""}`}
                   style={{borderLeft:`4px solid ${s.color}`}} onClick={() => setSelectedId(s.id)}>
@@ -660,10 +581,7 @@ function TeacherView() {
           <div className="t-section">
             <h2 className="section-title">오늘의 미션</h2>
             <div className="mission-edit">
-              <input type="date" value={missionDate} min={today()}
-                onChange={e => { setMissionDate(e.target.value); }}
-                style={{padding:"10px 12px",borderRadius:12,border:"2px solid #ddd",fontSize:14,fontFamily:"inherit",outline:"none",flexShrink:0}}/>
-              <input className="mission-input" value={mission} onChange={e => setMission(e.target.value)} placeholder="미션 내용 입력"/>
+              <input className="mission-input" value={mission} onChange={e => setMission(e.target.value)} placeholder="오늘의 미션 입력"/>
               <button className="mission-save-btn" onClick={saveMission}>{missionSaved ? "✓ 저장됨" : "저장"}</button>
             </div>
           </div>
@@ -684,8 +602,8 @@ function TeacherView() {
             {/* 수학 현황 */}
             {detailTab === "math" && (
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
-                {orderedStudents.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
-                {orderedStudents.map(s => {
+                {students.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
+                {students.map(s => {
                   const sub = todaySubs[s.id] || {};
                   const md = mathDetail[s.id];
                   const coms = mathComments[s.id] || [];
@@ -735,26 +653,6 @@ function TeacherView() {
                           </button>
                         </div>
                       </div>
-
-                      {/* 지난 수학 기록 */}
-                      <button onClick={() => toggleMathHist(s.id)}
-                        style={{marginTop:10,background:"none",border:"1.5px solid #eee",borderRadius:16,padding:"6px 16px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#aaa",width:"100%"}}>
-                        {expandedMathHist[s.id] ? "▲ 지난 기록 접기" : "▼ 지난 기록 보기"}
-                      </button>
-                      {expandedMathHist[s.id] && (mathHist[s.id]||[]).filter(m => m.date !== dateKey).length === 0 && (
-                        <div style={{fontSize:12,color:"#ccc",textAlign:"center",padding:"8px 0"}}>지난 기록이 없어요</div>
-                      )}
-                      {expandedMathHist[s.id] && (mathHist[s.id]||[]).filter(m => m.date !== dateKey).map(m => (
-                        <div key={m.date} style={{background:"#f7f5f0",borderRadius:12,padding:"12px 14px",marginTop:8}}>
-                          <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginBottom:6}}>{m.date}</div>
-                          <div style={{fontSize:13,color:"#555"}}>
-                            틀린 문제 <b>{m.wrong_count}개</b>
-                            {m.wrong_reason && <span style={{marginLeft:6,background:"#e8e8e8",borderRadius:6,padding:"1px 8px",fontSize:12}}>{m.wrong_reason}</span>}
-                            <span style={{marginLeft:6,background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#bbb",borderRadius:6,padding:"1px 7px",fontSize:11}}>{m.done?"✓완료":"미완료"}</span>
-                          </div>
-                          {m.memo && <div style={{fontSize:13,color:"#444",marginTop:6,lineHeight:1.6}}>💬 {m.memo}</div>}
-                        </div>
-                      ))}
                     </div>
                   );
                 })}
@@ -764,8 +662,8 @@ function TeacherView() {
             {/* 미션 현황 */}
             {detailTab === "mission" && (
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
-                {orderedStudents.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
-                {orderedStudents.map(s => {
+                {students.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
+                {students.map(s => {
                   const sub = todaySubs[s.id] || {};
                   const md = missionDetail[s.id];
                   const coms = missionComments[s.id] || [];
@@ -812,22 +710,6 @@ function TeacherView() {
                           </button>
                         </div>
                       </div>
-
-                      {/* 지난 미션 기록 */}
-                      <button onClick={() => toggleMissionHist(s.id)}
-                        style={{marginTop:10,background:"none",border:"1.5px solid #eee",borderRadius:16,padding:"6px 16px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#aaa",width:"100%"}}>
-                        {expandedMissionHist[s.id] ? "▲ 지난 기록 접기" : "▼ 지난 기록 보기"}
-                      </button>
-                      {expandedMissionHist[s.id] && (missionHist[s.id]||[]).filter(m => m.date !== dateKey).length === 0 && (
-                        <div style={{fontSize:12,color:"#ccc",textAlign:"center",padding:"8px 0"}}>지난 기록이 없어요</div>
-                      )}
-                      {expandedMissionHist[s.id] && (missionHist[s.id]||[]).filter(m => m.date !== dateKey).map(m => (
-                        <div key={m.date} style={{background:"#f7f5f0",borderRadius:12,padding:"12px 14px",marginTop:8}}>
-                          <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginBottom:6}}>{m.date}</div>
-                          <span style={{background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#bbb",borderRadius:6,padding:"2px 9px",fontSize:12}}>{m.done?"✓ 완료":"미완료"}</span>
-                          {m.comment && <div style={{fontSize:13,color:"#444",marginTop:6,lineHeight:1.6}}>💬 {m.comment}</div>}
-                        </div>
-                      ))}
                     </div>
                   );
                 })}
@@ -847,35 +729,18 @@ function TeacherView() {
                 </div>
                 {addError && <div style={{color:"#e55",fontSize:"13px",background:"#fff0f0",borderRadius:"8px",padding:"8px 12px"}}>{addError}</div>}
                 <div className="student-grid">
-                  {orderedStudents.map((s, idx) => {
+                  {students.map(s => {
                     const sub = todaySubs[s.id] || {};
                     return (
                       <div key={s.id} className="student-card" style={{borderTop:`4px solid ${s.color}`}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <div className="sc-name">{s.name}</div>
-                          <div style={{display:"flex",gap:2}}>
-                            <button onClick={() => moveStudent(s.id, 'up')} disabled={idx===0}
-                              style={{background:"none",border:"1px solid #eee",borderRadius:6,padding:"2px 6px",cursor:"pointer",fontSize:11,color:"#aaa",opacity:idx===0?0.3:1}}>▲</button>
-                            <button onClick={() => moveStudent(s.id, 'down')} disabled={idx===orderedStudents.length-1}
-                              style={{background:"none",border:"1px solid #eee",borderRadius:6,padding:"2px 6px",cursor:"pointer",fontSize:11,color:"#aaa",opacity:idx===orderedStudents.length-1?0.3:1}}>▼</button>
-                          </div>
-                        </div>
+                        <div className="sc-name">{s.name}</div>
                         <div className="sc-today-label">오늘 제출</div>
                         <div className="sc-badges">
                           <span className={`badge ${sub.writing?"on":""}`}>✏️ 글</span>
                           <span className={`badge ${sub.math?"on":""}`}>🔢 수학</span>
                           <span className={`badge ${sub.mission?"on":""}`}>🎯 미션</span>
                         </div>
-                        {deleteConfirm === s.id ? (
-                          <div style={{display:"flex",gap:4,marginTop:4}}>
-                            <button onClick={() => { removeStudent(s.id); setDeleteConfirm(null); }}
-                              style={{flex:1,padding:"4px 0",background:"#e55",color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>삭제</button>
-                            <button onClick={() => setDeleteConfirm(null)}
-                              style={{flex:1,padding:"4px 0",background:"#f0f0f0",color:"#666",border:"none",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>취소</button>
-                          </div>
-                        ) : (
-                          <button className="del-s-btn" onClick={() => setDeleteConfirm(s.id)}>삭제</button>
-                        )}
+                        <button className="del-s-btn" onClick={() => removeStudent(s.id)}>삭제</button>
                       </div>
                     );
                   })}
@@ -908,16 +773,6 @@ function StudentView() {
   const [saved, setSaved] = React.useState({});
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
-  const [studentOrder, setStudentOrderS] = React.useState(null);
-  const [allWritings, setAllWritings] = React.useState([]);
-  const [allWritingComments, setAllWritingComments] = React.useState({});
-  const [showHistory, setShowHistory] = React.useState(false);
-  const [allMaths, setAllMaths] = React.useState([]);
-  const [mathHistComments, setMathHistComments] = React.useState({});
-  const [showMathHistory, setShowMathHistory] = React.useState(false);
-  const [allMissions, setAllMissions] = React.useState([]);
-  const [missionHistComments, setMissionHistComments] = React.useState({});
-  const [showMissionHistory, setShowMissionHistory] = React.useState(false);
 
   const WRONG_REASONS = ["계산 실수","개념 이해 부족","문제를 잘못 읽음","풀이 방법 모름","시간 부족","기타"];
   const dateKey = today();
@@ -934,9 +789,6 @@ function StudentView() {
     loadMission();
     loadMyComments();
     loadNotifications();
-    loadAllWritings();
-    loadAllMaths();
-    loadAllMissions();
     // 실시간 알림 구독
     const channel = sb.channel(`student-${selectedId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications',
@@ -956,67 +808,13 @@ function StudentView() {
   }, [selectedId]);
 
   async function loadStudents() {
-    const { data } = await sb.from("students").select("*").order("created_at");
+    const { data } = await sb.from("students").select("*").eq("class_id", CLASS_ID).order("created_at");
     setStudents(data || []);
-    const { data: orderData } = await sb.from("missions").select("content").eq("date", "__student_order__").maybeSingle();
-    if (orderData) {
-      try { setStudentOrderS(JSON.parse(orderData.content)); } catch(e) {}
-    }
     setLoading(false);
   }
 
-  async function loadAllMaths() {
-    const { data } = await sb.from("maths").select("*").eq("student_id", selectedId).order("date", {ascending: false});
-    setAllMaths(data || []);
-    const pastDates = (data||[]).filter(m => m.date !== dateKey).map(m => "math_" + m.date);
-    if (pastDates.length > 0) {
-      const { data: cData } = await sb.from("comments").select("*").eq("student_id", selectedId).in("date", pastDates).order("created_at");
-      const grouped = {};
-      (cData||[]).forEach(c => {
-        const d = c.date.replace("math_", "");
-        if (!grouped[d]) grouped[d] = [];
-        grouped[d].push(c);
-      });
-      setMathHistComments(grouped);
-    }
-  }
-
-  async function loadAllMissions() {
-    const { data } = await sb.from("mission_submissions").select("*").eq("student_id", selectedId).order("date", {ascending: false});
-    setAllMissions(data || []);
-    const pastDates = (data||[]).filter(m => m.date !== dateKey).map(m => "mission_" + m.date);
-    if (pastDates.length > 0) {
-      const { data: cData } = await sb.from("comments").select("*").eq("student_id", selectedId).in("date", pastDates).order("created_at");
-      const grouped = {};
-      (cData||[]).forEach(c => {
-        const d = c.date.replace("mission_", "");
-        if (!grouped[d]) grouped[d] = [];
-        grouped[d].push(c);
-      });
-      setMissionHistComments(grouped);
-    }
-  }
-
-  async function loadAllWritings() {
-    const { data } = await sb.from("writings").select("*")
-      .eq("student_id", selectedId).order("date", {ascending: false});
-    const ws = data || [];
-    setAllWritings(ws);
-    const pastDates = ws.filter(w => w.date !== dateKey).map(w => w.date);
-    if (pastDates.length > 0) {
-      const { data: cData } = await sb.from("comments").select("*")
-        .eq("student_id", selectedId).in("date", pastDates).order("created_at");
-      const grouped = {};
-      (cData||[]).forEach(c => {
-        if (!grouped[c.date]) grouped[c.date] = [];
-        grouped[c.date].push(c);
-      });
-      setAllWritingComments(grouped);
-    }
-  }
-
   async function loadMission() {
-    const { data } = await sb.from("missions").select("*").eq("date", dateKey).maybeSingle();
+    const { data } = await sb.from("missions").select("*").eq("date", dateKey).eq("class_id", CLASS_ID).maybeSingle();
     if (data) setMissionText(data.content);
   }
 
@@ -1030,12 +828,27 @@ function StudentView() {
   }
 
   async function loadMyComments() {
-    const { data } = await sb.from("comments").select("*")
-      .eq("student_id", selectedId).order("created_at", {ascending:false}).limit(10);
-    const all = data || [];
-    setMyComments(all.filter(c => !c.date.startsWith("math_") && !c.date.startsWith("mission_")));
-    setMyMathComments(all.filter(c => c.date === "math_"+today()));
-    setMyMissionComments(all.filter(c => c.date === "mission_"+today()));
+    // 글쓰기 댓글 (최신 10개)
+    const { data: writeData } = await sb.from("comments").select("*")
+      .eq("student_id", selectedId)
+      .not("date", "like", "math_%")
+      .not("date", "like", "mission_%")
+      .order("created_at", {ascending:false}).limit(10);
+    setMyComments(writeData || []);
+
+    // 수학 댓글 (오늘 것만, 별도 쿼리)
+    const { data: mathData } = await sb.from("comments").select("*")
+      .eq("student_id", selectedId)
+      .eq("date", "math_"+today())
+      .order("created_at", {ascending:true});
+    setMyMathComments(mathData || []);
+
+    // 미션 댓글 (오늘 것만, 별도 쿼리)
+    const { data: missionData } = await sb.from("comments").select("*")
+      .eq("student_id", selectedId)
+      .eq("date", "mission_"+today())
+      .order("created_at", {ascending:true});
+    setMyMissionComments(missionData || []);
   }
 
   async function loadNotifications() {
@@ -1093,12 +906,7 @@ function StudentView() {
       <div className="student-select-wrap">
         <div className="ss-title">🌟 내 이름을 찾아요!</div>
         <div className="ss-grid">
-          {(() => {
-            const order = studentOrder;
-            if (!order || order.length === 0) return students;
-            const map = {}; order.forEach((id, i) => map[id] = i);
-            return [...students].sort((a, b) => (map[a.id] ?? 9999) - (map[b.id] ?? 9999));
-          })().map(s => (
+          {students.map(s => (
             <button key={s.id} className="ss-card" style={{background:s.color}} onClick={() => setSelectedId(s.id)}>
               <div className="ss-avatar">{s.name[0]}</div>
               <div className="ss-card-name">{s.name}</div>
@@ -1188,38 +996,6 @@ function StudentView() {
                 ))}
               </div>
             )}
-
-            {/* 지난 글 보기 */}
-            {allWritings.filter(w => w.date !== dateKey).length > 0 && (
-              <div>
-                <button onClick={() => setShowHistory(h => !h)}
-                  style={{background:"none",border:"1.5px solid #ddd",borderRadius:20,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#666",width:"100%",marginTop:8}}>
-                  {showHistory ? "▲ 지난 글 접기" : `▼ 지난 글 보기 (${allWritings.filter(w=>w.date!==dateKey).length}편)`}
-                </button>
-                {showHistory && allWritings.filter(w => w.date !== dateKey).map(w => {
-                  const coms = allWritingComments[w.date] || [];
-                  return (
-                    <article key={w.id} className="entry-card" style={{marginTop:12}}>
-                      <div className="ec-date">{w.date}</div>
-                      <div className="ec-title">{w.title || "제목 없음"}</div>
-                      <div className="ec-content">{w.content}</div>
-                      {coms.length > 0 && (
-                        <div className="comment-list">
-                          {coms.map(c => (
-                            <div key={c.id} className="comment-item">
-                              <div className="ci-avatar">선생님</div>
-                              <div className="ci-body">
-                                <div className="ci-text">{c.text}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
           </div>
         )}
 
@@ -1274,40 +1050,6 @@ function StudentView() {
                 ))}
               </div>
             )}
-
-            {/* 지난 수학 기록 */}
-            {allMaths.filter(m => m.date !== dateKey).length > 0 && (
-              <div>
-                <button onClick={() => setShowMathHistory(h => !h)}
-                  style={{background:"none",border:"1.5px solid #ddd",borderRadius:20,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#666",width:"100%",marginTop:8}}>
-                  {showMathHistory ? "▲ 지난 기록 접기" : `▼ 지난 수학 기록 (${allMaths.filter(m=>m.date!==dateKey).length}개)`}
-                </button>
-                {showMathHistory && allMaths.filter(m => m.date !== dateKey).map(m => {
-                  const coms = mathHistComments[m.date] || [];
-                  return (
-                    <article key={m.date} className="entry-card" style={{marginTop:12}}>
-                      <div className="ec-date">{m.date}</div>
-                      <div style={{fontSize:14,color:"#555",margin:"8px 0"}}>
-                        틀린 문제 <b>{m.wrong_count}개</b>
-                        {m.wrong_reason && <span style={{marginLeft:8,background:"#f0f0f0",borderRadius:8,padding:"2px 10px",fontSize:13}}>{m.wrong_reason}</span>}
-                        <span style={{marginLeft:8,background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#aaa",borderRadius:8,padding:"2px 8px",fontSize:12}}>{m.done?"✓ 완료":"미완료"}</span>
-                      </div>
-                      {m.memo && <div style={{fontSize:14,color:"#333",background:"#f7f5f0",borderRadius:10,padding:"8px 12px"}}>💬 {m.memo}</div>}
-                      {coms.length > 0 && (
-                        <div className="comment-list">
-                          {coms.map(c => (
-                            <div key={c.id} className="comment-item">
-                              <div className="ci-avatar">선생님</div>
-                              <div className="ci-body"><div className="ci-text">{c.text}</div></div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
           </div>
         )}
 
@@ -1342,38 +1084,6 @@ function StudentView() {
                 ))}
               </div>
             )}
-
-            {/* 지난 미션 기록 */}
-            {allMissions.filter(m => m.date !== dateKey).length > 0 && (
-              <div>
-                <button onClick={() => setShowMissionHistory(h => !h)}
-                  style={{background:"none",border:"1.5px solid #ddd",borderRadius:20,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#666",width:"100%",marginTop:8}}>
-                  {showMissionHistory ? "▲ 지난 기록 접기" : `▼ 지난 미션 기록 (${allMissions.filter(m=>m.date!==dateKey).length}개)`}
-                </button>
-                {showMissionHistory && allMissions.filter(m => m.date !== dateKey).map(m => {
-                  const coms = missionHistComments[m.date] || [];
-                  return (
-                    <article key={m.date} className="entry-card" style={{marginTop:12}}>
-                      <div className="ec-date">{m.date}</div>
-                      <div style={{marginBottom:8}}>
-                        <span style={{background:m.done?"#e8f5e9":"#f0f0f0",color:m.done?"#2d3a2e":"#aaa",borderRadius:8,padding:"3px 10px",fontSize:13,fontWeight:700}}>{m.done?"✓ 완료":"미완료"}</span>
-                      </div>
-                      {m.comment && <div style={{fontSize:14,color:"#333",background:"#f7f5f0",borderRadius:10,padding:"8px 12px"}}>💬 {m.comment}</div>}
-                      {coms.length > 0 && (
-                        <div className="comment-list">
-                          {coms.map(c => (
-                            <div key={c.id} className="comment-item">
-                              <div className="ci-avatar">선생님</div>
-                              <div className="ci-body"><div className="ci-text">{c.text}</div></div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -1389,8 +1099,60 @@ function App() {
   const [showPwModal, setShowPwModal] = React.useState(false);
   const [pwInput, setPwInput] = React.useState("");
   const [pwError, setPwError] = React.useState(false);
+  const [classConfig, setClassConfig] = React.useState(null);
+  const [classLoading, setClassLoading] = React.useState(true);
+  const [showSetup, setShowSetup] = React.useState(false);
+  const [setupName, setSetupName] = React.useState("");
+  const [setupPw, setSetupPw] = React.useState("");
+  const [setupSaving, setSetupSaving] = React.useState(false);
 
-  const TEACHER_PW = "7963"; // ← 여기서 비밀번호 변경
+  React.useEffect(() => { loadClass(); }, []);
+
+  async function loadClass() {
+    const { data } = await sb.from("classrooms").select("*").eq("class_id", CLASS_ID).maybeSingle();
+    if (data) { setClassConfig(data); }
+    else { setShowSetup(true); }
+    setClassLoading(false);
+  }
+
+  async function createClass() {
+    if (!setupName.trim() || !setupPw.trim()) return;
+    setSetupSaving(true);
+    const { data } = await sb.from("classrooms")
+      .insert({ class_id: CLASS_ID, class_name: setupName.trim(), teacher_pw: setupPw.trim() })
+      .select().single();
+    if (data) { setClassConfig(data); setShowSetup(false); }
+    setSetupSaving(false);
+  }
+
+  if (classLoading) return <div className="spinner"><div className="spin-circle"/></div>;
+
+  if (showSetup) return (
+    <div className="landing">
+      <div className="landing-inner" style={{gap:20}}>
+        <div className="landing-emoji">🏫</div>
+        <h1 className="landing-title" style={{fontSize:36}}>반 첫 설정</h1>
+        <p className="landing-sub" style={{fontSize:15}}>반 코드: <b>{CLASS_ID}</b></p>
+        <div style={{display:"flex",flexDirection:"column",gap:12,width:280}}>
+          <input placeholder="반 이름 (예: 3학년 2반)"
+            value={setupName} onChange={e=>setSetupName(e.target.value)}
+            style={{padding:"12px 16px",borderRadius:12,border:"2px solid #ddd",fontSize:15,fontFamily:"'Noto Sans KR',sans-serif",outline:"none"}}/>
+          <input type="password" placeholder="선생님 비밀번호 설정"
+            value={setupPw} onChange={e=>setSetupPw(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&createClass()}
+            style={{padding:"12px 16px",borderRadius:12,border:"2px solid #ddd",fontSize:15,fontFamily:"'Noto Sans KR',sans-serif",outline:"none"}}/>
+          <button onClick={createClass}
+            disabled={setupSaving||!setupName.trim()||!setupPw.trim()}
+            style={{padding:"14px",background:"#2d3a2e",color:"#fff",border:"none",borderRadius:12,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"'Noto Sans KR',sans-serif",opacity:(setupSaving||!setupName.trim()||!setupPw.trim())?0.5:1}}>
+            {setupSaving?"저장 중...":"우리 교실 만들기 🎉"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const TEACHER_PW = classConfig.teacher_pw;
+  const CLASS_NAME = classConfig.class_name;
 
   function tryTeacher() {
     if (pwInput === TEACHER_PW) {
@@ -1404,7 +1166,7 @@ function App() {
     <div className="landing">
       <div className="landing-inner">
         <div className="landing-emoji">📚</div>
-        <h1 className="landing-title">우리 교실</h1>
+        <h1 className="landing-title">{CLASS_NAME}</h1>
         <p className="landing-sub">누구세요?</p>
         <div className="landing-btns">
           <button className="land-btn teacher" onClick={() => { setShowPwModal(true); setPwError(false); setPwInput(""); }}>
