@@ -327,7 +327,7 @@ function TeacherView() {
 
   async function loadStudents() {
     setLoading(true);
-    const { data } = await sb.from("students").select("*").eq("class_id", CLASS_ID).order("created_at");
+    const { data } = await sb.from("students").select("*").eq("class_id", CLASS_ID).order("sort_order", {nullsFirst:false}).order("created_at");
     setStudents(data || []);
     setLoading(false);
   }
@@ -393,7 +393,8 @@ function TeacherView() {
     const n = newName.trim(); if (!n) return;
     setAdding(true); setAddError("");
     const color = COLORS[students.length % COLORS.length];
-    const { data, error } = await sb.from("students").insert({ name: n, color, class_id: CLASS_ID }).select().single();
+    const maxOrder = students.length > 0 ? Math.max(...students.map(s => s.sort_order ?? 0)) : 0;
+    const { data, error } = await sb.from("students").insert({ name: n, color, class_id: CLASS_ID, sort_order: maxOrder + 1 }).select().single();
     setAdding(false);
     if (error) { setAddError("등록 실패: " + (error.message || error.code || JSON.stringify(error))); return; }
     if (data) { setStudents(p => [...p, data]); setNewName(""); }
@@ -403,6 +404,22 @@ function TeacherView() {
     await sb.from("students").delete().eq("id", id);
     setStudents(p => p.filter(s => s.id !== id));
     if (selectedId === id) { setSelectedId(null); setWritings([]); }
+  }
+
+  async function moveStudent(id, dir) {
+    const idx = students.findIndex(s => s.id === id);
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= students.length) return;
+    const a = students[idx], b = students[swapIdx];
+    const orderA = a.sort_order ?? idx;
+    const orderB = b.sort_order ?? swapIdx;
+    await sb.from("students").update({ sort_order: orderB }).eq("id", a.id);
+    await sb.from("students").update({ sort_order: orderA }).eq("id", b.id);
+    const updated = [...students];
+    updated[idx] = { ...a, sort_order: orderB };
+    updated[swapIdx] = { ...b, sort_order: orderA };
+    updated.sort((x, y) => (x.sort_order ?? 999) - (y.sort_order ?? 999));
+    setStudents(updated);
   }
 
   async function saveMission() {
@@ -490,7 +507,7 @@ function TeacherView() {
         <div className="writings-layout">
           <aside className="writings-sidebar">
             <div className="ws-title">학생 선택</div>
-            {students.map(s => {
+            {students.map((s, i) => {
               const sub = todaySubs[s.id] || {};
               const writingCount = 0; // 성능상 전체 카운트는 선택시만
               return (
@@ -603,7 +620,7 @@ function TeacherView() {
             {detailTab === "math" && (
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
                 {students.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
-                {students.map(s => {
+                {students.map((s, i) => {
                   const sub = todaySubs[s.id] || {};
                   const md = mathDetail[s.id];
                   const coms = mathComments[s.id] || [];
@@ -663,7 +680,7 @@ function TeacherView() {
             {detailTab === "mission" && (
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
                 {students.length===0 && <div className="no-select">학생을 먼저 등록하세요</div>}
-                {students.map(s => {
+                {students.map((s, i) => {
                   const sub = todaySubs[s.id] || {};
                   const md = missionDetail[s.id];
                   const coms = missionComments[s.id] || [];
@@ -729,11 +746,19 @@ function TeacherView() {
                 </div>
                 {addError && <div style={{color:"#e55",fontSize:"13px",background:"#fff0f0",borderRadius:"8px",padding:"8px 12px"}}>{addError}</div>}
                 <div className="student-grid">
-                  {students.map(s => {
+                  {students.map((s, i) => {
                     const sub = todaySubs[s.id] || {};
                     return (
                       <div key={s.id} className="student-card" style={{borderTop:`4px solid ${s.color}`}}>
-                        <div className="sc-name">{s.name}</div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div className="sc-name">{s.name}</div>
+                          <div style={{display:"flex",gap:2}}>
+                            <button onClick={()=>moveStudent(s.id,"up")} disabled={i===0}
+                              style={{background:"none",border:"1px solid #e0e0e0",borderRadius:6,width:22,height:22,cursor:"pointer",fontSize:11,color:"#aaa",padding:0,lineHeight:1,opacity:i===0?0.3:1}}>▲</button>
+                            <button onClick={()=>moveStudent(s.id,"down")} disabled={i===students.length-1}
+                              style={{background:"none",border:"1px solid #e0e0e0",borderRadius:6,width:22,height:22,cursor:"pointer",fontSize:11,color:"#aaa",padding:0,lineHeight:1,opacity:i===students.length-1?0.3:1}}>▼</button>
+                          </div>
+                        </div>
                         <div className="sc-today-label">오늘 제출</div>
                         <div className="sc-badges">
                           <span className={`badge ${sub.writing?"on":""}`}>✏️ 글</span>
@@ -773,6 +798,10 @@ function StudentView() {
   const [saved, setSaved] = React.useState({});
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
+  const [writingHistory, setWritingHistory] = React.useState([]);
+  const [mathHistory, setMathHistory] = React.useState([]);
+  const [missionHistory, setMissionHistory] = React.useState([]);
+  const [allComments, setAllComments] = React.useState([]);
 
   const WRONG_REASONS = ["계산 실수","개념 이해 부족","문제를 잘못 읽음","풀이 방법 모름","시간 부족","기타"];
   const dateKey = today();
@@ -788,6 +817,7 @@ function StudentView() {
     loadTodayData();
     loadMission();
     loadMyComments();
+    loadHistory();
     loadNotifications();
     // 실시간 알림 구독
     const channel = sb.channel(`student-${selectedId}`)
@@ -808,7 +838,7 @@ function StudentView() {
   }, [selectedId]);
 
   async function loadStudents() {
-    const { data } = await sb.from("students").select("*").eq("class_id", CLASS_ID).order("created_at");
+    const { data } = await sb.from("students").select("*").eq("class_id", CLASS_ID).order("sort_order", {nullsFirst:false}).order("created_at");
     setStudents(data || []);
     setLoading(false);
   }
@@ -849,6 +879,22 @@ function StudentView() {
       .eq("date", "mission_"+today())
       .order("created_at", {ascending:true});
     setMyMissionComments(missionData || []);
+  }
+
+  async function loadHistory() {
+    const sid = selectedId;
+    const { data: ws } = await sb.from("writings").select("*")
+      .eq("student_id", sid).neq("date", dateKey).order("date", {ascending:false});
+    setWritingHistory(ws || []);
+    const { data: ms } = await sb.from("maths").select("*")
+      .eq("student_id", sid).neq("date", dateKey).order("date", {ascending:false});
+    setMathHistory(ms || []);
+    const { data: mis } = await sb.from("mission_submissions").select("*")
+      .eq("student_id", sid).neq("date", dateKey).order("date", {ascending:false});
+    setMissionHistory(mis || []);
+    const { data: cs } = await sb.from("comments").select("*")
+      .eq("student_id", sid).order("created_at", {ascending:true});
+    setAllComments(cs || []);
   }
 
   async function loadNotifications() {
@@ -996,6 +1042,29 @@ function StudentView() {
                 ))}
               </div>
             )}
+
+            {/* 이전 글 목록 */}
+            {writingHistory.length > 0 && (
+              <div style={{marginTop:24}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#aaa",marginBottom:12,borderTop:"2px dashed #eee",paddingTop:16}}>📚 이전 글</div>
+                {writingHistory.map(w => {
+                  const wc = allComments.filter(c => c.date === w.date);
+                  return (
+                    <div key={w.id} style={{background:"#fff",borderRadius:14,padding:20,marginBottom:12,boxShadow:"0 2px 8px rgba(0,0,0,.05)",borderLeft:`3px solid ${student.color}`}}>
+                      <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginBottom:6}}>{w.date}</div>
+                      {w.title && <div style={{fontFamily:"'Gaegu',cursive",fontSize:20,color:"#2d3a2e",marginBottom:8}}>{w.title}</div>}
+                      <div style={{fontSize:14,lineHeight:1.9,color:"#333",whiteSpace:"pre-wrap"}}>{w.content}</div>
+                      {wc.length > 0 && (
+                        <div style={{marginTop:12,padding:"10px 14px",background:"#f0f7f0",borderRadius:10}}>
+                          <div style={{fontSize:11,fontWeight:700,color:"#4a7a4e",marginBottom:6}}>💬 선생님 댓글</div>
+                          {wc.map(c => <div key={c.id} style={{fontSize:13,lineHeight:1.8,color:"#333",whiteSpace:"pre-wrap"}}>{c.text}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1050,6 +1119,33 @@ function StudentView() {
                 ))}
               </div>
             )}
+
+            {/* 이전 수학 기록 */}
+            {mathHistory.length > 0 && (
+              <div style={{marginTop:24}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#aaa",marginBottom:12,borderTop:"2px dashed #eee",paddingTop:16}}>🔢 이전 수학 기록</div>
+                {mathHistory.map(m => {
+                  const mc = allComments.filter(c => c.date === "math_"+m.date);
+                  return (
+                    <div key={m.id} style={{background:"#fff",borderRadius:14,padding:20,marginBottom:12,boxShadow:"0 2px 8px rgba(0,0,0,.05)",borderLeft:`3px solid ${student.color}`}}>
+                      <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginBottom:8}}>{m.date}</div>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:6}}>
+                        <span style={{background:"#f0f0f0",borderRadius:20,padding:"3px 10px",fontSize:13}}>틀린 문제 {m.wrong_count}개</span>
+                        {m.wrong_reason && <span style={{background:"#f0f0f0",borderRadius:20,padding:"3px 10px",fontSize:13}}>{m.wrong_reason}</span>}
+                        {m.done && <span style={{background:"#e8f5e9",color:"#2d7a40",borderRadius:20,padding:"3px 10px",fontSize:13,fontWeight:700}}>✓ 오답 완료</span>}
+                      </div>
+                      {m.memo && <div style={{fontSize:13,color:"#555",lineHeight:1.7,marginTop:6}}>{m.memo}</div>}
+                      {mc.length > 0 && (
+                        <div style={{marginTop:12,padding:"10px 14px",background:"#f0f7f0",borderRadius:10}}>
+                          <div style={{fontSize:11,fontWeight:700,color:"#4a7a4e",marginBottom:6}}>💬 선생님 댓글</div>
+                          {mc.map(c => <div key={c.id} style={{fontSize:13,lineHeight:1.8,color:"#333",whiteSpace:"pre-wrap"}}>{c.text}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1082,6 +1178,29 @@ function StudentView() {
                     <div className="scp-text">{c.text}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* 이전 미션 기록 */}
+            {missionHistory.length > 0 && (
+              <div style={{marginTop:24}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#aaa",marginBottom:12,borderTop:"2px dashed #eee",paddingTop:16}}>🎯 이전 미션 기록</div>
+                {missionHistory.map(ms => {
+                  const msc = allComments.filter(c => c.date === "mission_"+ms.date);
+                  return (
+                    <div key={ms.id} style={{background:"#fff",borderRadius:14,padding:20,marginBottom:12,boxShadow:"0 2px 8px rgba(0,0,0,.05)",borderLeft:`3px solid ${student.color}`}}>
+                      <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginBottom:8}}>{ms.date}</div>
+                      {ms.done && <span style={{background:"#e8f5e9",color:"#2d7a40",borderRadius:20,padding:"3px 10px",fontSize:13,fontWeight:700,display:"inline-block",marginBottom:6}}>✓ 미션 완료</span>}
+                      {ms.comment && <div style={{fontSize:13,color:"#555",lineHeight:1.7,marginTop:6}}>{ms.comment}</div>}
+                      {msc.length > 0 && (
+                        <div style={{marginTop:12,padding:"10px 14px",background:"#f0f7f0",borderRadius:10}}>
+                          <div style={{fontSize:11,fontWeight:700,color:"#4a7a4e",marginBottom:6}}>💬 선생님 댓글</div>
+                          {msc.map(c => <div key={c.id} style={{fontSize:13,lineHeight:1.8,color:"#333",whiteSpace:"pre-wrap"}}>{c.text}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
