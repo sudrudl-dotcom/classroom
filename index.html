@@ -473,7 +473,14 @@ function TeacherView() {
   }
 
   async function saveMission() {
-    const { error } = await sb.from("missions").upsert({ content: mission, date: dateKey, class_id: CLASS_ID }, { onConflict: "date,class_id" });
+    const { data: existing } = await sb.from("missions")
+      .select("id").eq("date", dateKey).eq("class_id", CLASS_ID).maybeSingle();
+    let error;
+    if (existing) {
+      ({ error } = await sb.from("missions").update({ content: mission }).eq("id", existing.id));
+    } else {
+      ({ error } = await sb.from("missions").insert({ content: mission, date: dateKey, class_id: CLASS_ID }));
+    }
     if (error) { alert("미션 저장 실패: " + error.message); return; }
     setMissionSaved(true); setTimeout(() => setMissionSaved(false), 1500);
   }
@@ -1176,14 +1183,9 @@ function StudentView() {
                 value={math.memo}
                 onChange={e => setMath({...math, memo:e.target.value})}/>
             </div>
-            <button className={`done-btn ${math.done?"done":""}`}
-              style={math.done?{background:student.color,borderColor:student.color,color:"#fff"}:{}}
-              onClick={() => setMath({...math, done:!math.done})}>
-              {math.done ? "✓ 오답 고치기 완료!" : "오답 고치기 완료 체크"}
-            </button>
             <button className="submit-btn" style={{background:student.color}}
-              onClick={saveMath} disabled={submitting}>
-              {saved.math ? "✓ 저장됐어요!" : submitting ? "저장 중…" : "📤 제출하기"}
+              onClick={() => { setMath(m => ({...m, done:true})); saveMath(); }} disabled={submitting}>
+              {saved.math ? "✓ 저장됐어요!" : submitting ? "저장 중…" : "📤 오답 완료 & 제출"}
             </button>
             {myMathComments.length > 0 && (
               <div className="s-comment-preview">
@@ -1232,19 +1234,14 @@ function StudentView() {
               <div className="mb-label">🎯 오늘의 미션</div>
               <div className="mb-text">{missionText}</div>
             </div>
-            <button className={`done-btn ${missionData.done?"done":""}`}
-              style={missionData.done?{background:student.color,borderColor:student.color,color:"#fff"}:{}}
-              onClick={() => setMissionData({...missionData, done:!missionData.done})}>
-              {missionData.done ? "✓ 완료했어요!" : "미션 완료 체크!"}
-            </button>
             <div className="mc-label" style={{marginTop:8}}>한마디 (선택)</div>
             <textarea className="mission-comment-input"
               placeholder="미션 하고 나서 느낌을 써 보세요!"
               value={missionData.comment}
               onChange={e => setMissionData({...missionData, comment:e.target.value})}/>
             <button className="submit-btn" style={{background:student.color}}
-              onClick={saveMission} disabled={submitting}>
-              {saved.mission ? "✓ 저장됐어요!" : submitting ? "저장 중…" : "📤 제출하기"}
+              onClick={() => { setMissionData(m => ({...m, done:true})); saveMission(); }} disabled={submitting}>
+              {saved.mission ? "✓ 저장됐어요!" : submitting ? "저장 중…" : "🎯 미션 완료 & 제출"}
             </button>
             {myMissionComments.length > 0 && (
               <div className="s-comment-preview">
