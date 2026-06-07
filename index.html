@@ -288,6 +288,7 @@ function TeacherView() {
   const [commentDraft, setCommentDraft] = React.useState({});
   const [mission, setMission] = React.useState("오늘의 미션을 입력하세요");
   const [missionSaved, setMissionSaved] = React.useState(false);
+  const [missionDate, setMissionDate] = React.useState(today());
   const [newName, setNewName] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [sending, setSending] = React.useState({});
@@ -359,9 +360,10 @@ function TeacherView() {
     setLoading(false);
   }
 
-  async function loadMission() {
-    const { data } = await sb.from("missions").select("*").eq("date", today()).eq("class_id", CLASS_ID).maybeSingle();
-    if (data) setMission(data.content);
+  async function loadMission(date) {
+    const d = date || missionDate || today();
+    const { data } = await sb.from("missions").select("*").eq("date", d).eq("class_id", CLASS_ID).maybeSingle();
+    setMission(data ? data.content : "");
   }
 
   async function loadWritings(studentId) {
@@ -473,13 +475,14 @@ function TeacherView() {
   }
 
   async function saveMission() {
+    const d = missionDate || today();
     const { data: existing } = await sb.from("missions")
-      .select("id").eq("date", dateKey).eq("class_id", CLASS_ID).maybeSingle();
+      .select("id").eq("date", d).eq("class_id", CLASS_ID).maybeSingle();
     let error;
     if (existing) {
       ({ error } = await sb.from("missions").update({ content: mission }).eq("id", existing.id));
     } else {
-      ({ error } = await sb.from("missions").insert({ content: mission, date: dateKey, class_id: CLASS_ID }));
+      ({ error } = await sb.from("missions").insert({ content: mission, date: d, class_id: CLASS_ID }));
     }
     if (error) { alert("미션 저장 실패: " + error.message); return; }
     setMissionSaved(true); setTimeout(() => setMissionSaved(false), 1500);
@@ -653,9 +656,17 @@ function TeacherView() {
       {tab === "students" && (
         <div className="t-content">
           <div className="t-section">
-            <h2 className="section-title">오늘의 미션</h2>
+            <h2 className="section-title">미션</h2>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
+              <input type="date" value={missionDate}
+                onChange={e => { setMissionDate(e.target.value); loadMission(e.target.value); }}
+                style={{padding:"10px 12px",borderRadius:10,border:"2px solid #ddd",fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",outline:"none",cursor:"pointer"}}/>
+              <span style={{fontSize:12,color:missionDate===today()?"#4a7a4e":"#e07b6a",fontWeight:700}}>
+                {missionDate===today()?"오늘":"다른 날짜"}
+              </span>
+            </div>
             <div className="mission-edit">
-              <input className="mission-input" value={mission} onChange={e => setMission(e.target.value)} placeholder="오늘의 미션 입력"/>
+              <input className="mission-input" value={mission} onChange={e => setMission(e.target.value)} placeholder="미션 내용 입력"/>
               <button className="mission-save-btn" onClick={saveMission}>{missionSaved ? "✓ 저장됨" : "저장"}</button>
             </div>
           </div>
