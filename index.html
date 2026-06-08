@@ -245,6 +245,7 @@ function TeacherView(){
   const[deleteConfirm,setDeleteConfirm]=React.useState(null);
   // 교사 지난 기록
   const[missionsByDate,setMissionsByDate]=React.useState({});
+  const[mobileShowDetail,setMobileShowDetail]=React.useState(false);
   const[expandedMathHist,setExpandedMathHist]=React.useState({});
   const[mathHist,setMathHist]=React.useState({});
   const[expandedMissionHist,setExpandedMissionHist]=React.useState({});
@@ -406,17 +407,23 @@ function TeacherView(){
 
       {tab==="writings"&&(
         <div className="writings-layout">
-          <aside className="writings-sidebar">
+          <aside className="writings-sidebar" style={mobileShowDetail&&window.innerWidth<=600?{display:"none"}:{}}>
             <div className="ws-title">학생 선택</div>
             {students.map(s=>{const sub=todaySubs[s.id]||{};return(
-              <div key={s.id} className={`ws-item ${selectedId===s.id?"active":""}`} style={{borderLeft:`4px solid ${s.color}`}} onClick={()=>setSelectedId(s.id)}>
+              <div key={s.id} className={`ws-item ${selectedId===s.id?"active":""}`} style={{borderLeft:`4px solid ${s.color}`}} onClick={()=>{setSelectedId(s.id);setMobileShowDetail(true);}}>
                 <span className="ws-name">{s.name}</span>
                 <div className="ws-badges-mini"><span className={`dot ${sub.writing?"on":""}`}/><span className={`dot ${sub.math?"on":""}`}/><span className={`dot ${sub.mission?"on":""}`}/></div>
               </div>
             );})}
             {students.length===0&&<div className="ws-empty">학생을 먼저 등록하세요</div>}
           </aside>
-          <main className="writings-main">
+          <main className="writings-main" style={!mobileShowDetail&&window.innerWidth<=600?{display:"none"}:{}}>
+            {window.innerWidth<=600&&mobileShowDetail&&(
+              <button onClick={()=>{setMobileShowDetail(false);setSelectedId(null);}}
+                style={{background:"none",border:"1.5px solid #ddd",borderRadius:20,padding:"7px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#555",marginBottom:16}}>
+                ← 목록으로
+              </button>
+            )}
             {!selected?<div className="no-select">← 학생을 선택하면 글이 표시됩니다</div>:(
               <>
                 <div className="wm-header">
