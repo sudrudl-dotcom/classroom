@@ -250,6 +250,7 @@ function TeacherView(){
   const[mathHist,setMathHist]=React.useState({});
   const[expandedMissionHist,setExpandedMissionHist]=React.useState({});
   const[missionHist,setMissionHist]=React.useState({});
+  const[refreshing,setRefreshing]=React.useState(false);
 
   const dateKey=today();
   const selected=students.find(s=>s.id===selectedId);
@@ -267,6 +268,35 @@ function TeacherView(){
     return()=>sb.removeChannel(ch);
   },[selectedId]);
 
+  async function refreshAll(){
+    setRefreshing(true);
+    // 화면 상태(탭, 선택 학생) 유지하면서 데이터만 새로 불러오기
+    const{data:sData}=await sb.from("students").select("*").eq("class_id",CLASS_ID).order("sort_order",{nullsFirst:false}).order("created_at");
+    if(sData)setStudents(sData);
+    await loadMission();
+    if(sData&&sData.length>0){
+      const ids=sData.map(s=>s.id);
+      const{data:wData}=await sb.from("writings").select("student_id").in("student_id",ids).eq("date",dateKey);
+      const{data:mData}=await sb.from("maths").select("*").in("student_id",ids).eq("date",dateKey);
+      const{data:msData}=await sb.from("mission_submissions").select("*").in("student_id",ids).eq("date",dateKey);
+      const subs={};const mDet={};const msDet={};
+      ids.forEach(id=>{
+        const m=(mData||[]).find(m=>m.student_id===id);
+        const ms=(msData||[]).find(m=>m.student_id===id);
+        subs[id]={writing:!!(wData||[]).find(w=>w.student_id===id),math:!!(m&&m.done),mission:!!(ms&&ms.done)};
+        if(m)mDet[id]=m;if(ms)msDet[id]=ms;
+      });
+      setTodaySubs(subs);setMathDetail(mDet);setMissionDetail(msDet);
+      const{data:mcData}=await sb.from("comments").select("*").in("student_id",ids).eq("date","math_"+dateKey).order("created_at");
+      const{data:mscData}=await sb.from("comments").select("*").in("student_id",ids).eq("date","mission_"+dateKey).order("created_at");
+      const mc={};const msc={};
+      (mcData||[]).forEach(c=>{if(!mc[c.student_id])mc[c.student_id]=[];mc[c.student_id].push(c);});
+      (mscData||[]).forEach(c=>{if(!msc[c.student_id])msc[c.student_id]=[];msc[c.student_id].push(c);});
+      setMathComments(mc);setMissionComments(msc);
+    }
+    if(selectedId)await loadWritings(selectedId);
+    setRefreshing(false);
+  }
   async function loadClassSettings(){const{data}=await sb.from("classrooms").select("*").eq("class_id",CLASS_ID).maybeSingle();if(data){setEditClassName(data.class_name||"");setEditEmoji(data.emoji||"📚");}}
   async function loadStudents(){setLoading(true);const{data}=await sb.from("students").select("*").eq("class_id",CLASS_ID).order("sort_order",{nullsFirst:false}).order("created_at");setStudents(data||[]);setLoading(false);}
   async function loadMission(date){const d=date||missionDate||today();const{data}=await sb.from("missions").select("*").eq("date",d).eq("class_id",CLASS_ID).maybeSingle();setMission(data?data.content:"");}
@@ -403,6 +433,10 @@ function TeacherView(){
             <button key={t.key} className={`t-nav-btn ${tab===t.key?"active":""}`} onClick={()=>setTab(t.key)}>{t.label}</button>
           ))}
         </nav>
+        <button onClick={refreshAll} disabled={refreshing} style={{marginLeft:"auto",background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",borderRadius:20,padding:"6px 14px",fontSize:13,cursor:refreshing?"not-allowed":"pointer",fontFamily:"'Noto Sans KR',sans-serif",display:"flex",alignItems:"center",gap:6,opacity:refreshing?.6:1,flexShrink:0}}>
+          <span style={{display:"inline-block",animation:refreshing?"spin .8s linear infinite":"none"}}>🔄</span>
+          <span style={{fontSize:12}}>{refreshing?"새로고침 중...":"새로고침"}</span>
+        </button>
       </header>
 
       {tab==="writings"&&(
