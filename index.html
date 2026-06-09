@@ -259,14 +259,15 @@ function TeacherView(){
   React.useEffect(()=>{if(selectedId)loadWritings(selectedId);},[selectedId]);
   React.useEffect(()=>{if(students.length>0)loadTodaySubs();},[students]);
   React.useEffect(()=>{
-    const ch=sb.channel('teacher-rt')
+    if(students.length===0)return;
+    const ch=sb.channel('teacher-rt-'+students.map(s=>s.id).join(','))
       .on('postgres_changes',{event:'*',schema:'public',table:'writings'},()=>{loadTodaySubs();if(selectedId)loadWritings(selectedId);})
       .on('postgres_changes',{event:'*',schema:'public',table:'maths'},()=>loadTodaySubs())
       .on('postgres_changes',{event:'*',schema:'public',table:'mission_submissions'},()=>loadTodaySubs())
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'comments'},()=>{if(selectedId)loadWritings(selectedId);})
       .subscribe();
     return()=>sb.removeChannel(ch);
-  },[selectedId]);
+  },[selectedId,students]);
 
   async function refreshAll(){
     setRefreshing(true);
