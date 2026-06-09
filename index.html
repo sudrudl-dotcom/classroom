@@ -252,6 +252,12 @@ function TeacherView(){
   const[missionHist,setMissionHist]=React.useState({});
   const[refreshing,setRefreshing]=React.useState(false);
 
+  // ref로 항상 최신값 유지 → RT 콜백에서 stale closure 없이 사용
+  const studentsRef=React.useRef([]);
+  const selectedIdRef=React.useRef(null);
+  React.useEffect(()=>{studentsRef.current=students;},[students]);
+  React.useEffect(()=>{selectedIdRef.current=selectedId;},[selectedId]);
+
   const dateKey=today();
   const selected=students.find(s=>s.id===selectedId);
 
@@ -259,15 +265,14 @@ function TeacherView(){
   React.useEffect(()=>{if(selectedId)loadWritings(selectedId);},[selectedId]);
   React.useEffect(()=>{if(students.length>0)loadTodaySubs();},[students]);
   React.useEffect(()=>{
-    if(students.length===0)return;
-    const ch=sb.channel('teacher-rt-'+students.map(s=>s.id).join(','))
-      .on('postgres_changes',{event:'*',schema:'public',table:'writings'},()=>{loadTodaySubs();if(selectedId)loadWritings(selectedId);})
+    const ch=sb.channel('t-rt-'+CLASS_ID)
+      .on('postgres_changes',{event:'*',schema:'public',table:'writings'},()=>{loadTodaySubs();const sid=selectedIdRef.current;if(sid)loadWritings(sid);})
       .on('postgres_changes',{event:'*',schema:'public',table:'maths'},()=>loadTodaySubs())
       .on('postgres_changes',{event:'*',schema:'public',table:'mission_submissions'},()=>loadTodaySubs())
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'comments'},()=>{if(selectedId)loadWritings(selectedId);})
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'comments'},()=>{const sid=selectedIdRef.current;if(sid)loadWritings(sid);})
       .subscribe();
     return()=>sb.removeChannel(ch);
-  },[selectedId,students]);
+  },[]);
 
   async function refreshAll(){
     setRefreshing(true);
@@ -314,7 +319,7 @@ function TeacherView(){
     else{setComments({});setMissionsByDate({});}
   }
   async function loadTodaySubs(){
-    const ids=students.map(s=>s.id);
+    const ids=(studentsRef.current.length>0?studentsRef.current:students).map(s=>s.id);
     const{data:wData}=await sb.from("writings").select("student_id").in("student_id",ids).eq("date",dateKey);
     const{data:mData}=await sb.from("maths").select("*").in("student_id",ids).eq("date",dateKey);
     const{data:msData}=await sb.from("mission_submissions").select("*").in("student_id",ids).eq("date",dateKey);
