@@ -273,6 +273,11 @@ function TeacherView(){
       .subscribe();
     return()=>sb.removeChannel(ch);
   },[]);
+  // 실시간 구독이 안 될 경우를 대비해 10초마다 자동 폴링
+  React.useEffect(()=>{
+    const timer=setInterval(()=>{if(studentsRef.current.length>0)loadTodaySubs();},10000);
+    return()=>clearInterval(timer);
+  },[]);
 
   async function refreshAll(){
     setRefreshing(true);
