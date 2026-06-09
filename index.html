@@ -768,14 +768,16 @@ function StudentView(){
     await sb.from("writings").upsert({student_id:selectedId,date:dateKey,title:writing.title,content:writing.content},{onConflict:"student_id,date"});
     setSubmitting(false);setSaved(p=>({...p,writing:true}));setTimeout(()=>setSaved(p=>({...p,writing:false})),2000);
   }
-  async function saveMath(){
+  async function saveMath(doneOverride){
     setSubmitting(true);
-    await sb.from("maths").upsert({student_id:selectedId,date:dateKey,wrong_count:math.wrong_count,wrong_reason:math.wrong_reason,memo:math.memo,done:math.done},{onConflict:"student_id,date"});
+    const doneVal=doneOverride!==undefined?doneOverride:math.done;
+    await sb.from("maths").upsert({student_id:selectedId,date:dateKey,wrong_count:math.wrong_count,wrong_reason:math.wrong_reason,memo:math.memo,done:doneVal},{onConflict:"student_id,date"});
     setSubmitting(false);setSaved(p=>({...p,math:true}));setTimeout(()=>setSaved(p=>({...p,math:false})),2000);
   }
-  async function saveMission(){
+  async function saveMission(doneOverride){
     setSubmitting(true);
-    await sb.from("mission_submissions").upsert({student_id:selectedId,date:dateKey,done:missionData.done,comment:missionData.comment},{onConflict:"student_id,date"});
+    const doneVal=doneOverride!==undefined?doneOverride:missionData.done;
+    await sb.from("mission_submissions").upsert({student_id:selectedId,date:dateKey,done:doneVal,comment:missionData.comment},{onConflict:"student_id,date"});
     setSubmitting(false);setSaved(p=>({...p,mission:true}));setTimeout(()=>setSaved(p=>({...p,mission:false})),2000);
   }
 
@@ -876,7 +878,7 @@ function StudentView(){
             </div>
             {math.wrong_count!==0&&<div className="math-card"><div className="mc-label">왜 틀렸을까요?</div><div className="reason-grid">{WRONG_REASONS.map(r=><button key={r} className={`reason-btn ${math.wrong_reason===r?"active":""}`} style={math.wrong_reason===r?{background:student.color,color:"#fff",borderColor:student.color}:{}} onClick={()=>setMath({...math,wrong_reason:r})}>{r}</button>)}</div></div>}
             <div className="math-card"><div className="mc-label">선생님께 하고 싶은 말 (선택)</div><textarea className="mission-comment-input" placeholder="오늘 수학 어땠어요?" value={math.memo} onChange={e=>setMath({...math,memo:e.target.value})}/></div>
-            <button className="submit-btn" style={{background:student.color}} onClick={()=>{setMath(m=>({...m,done:true}));saveMath();}} disabled={submitting}>{saved.math?"✓ 저장됐어요!":submitting?"저장 중…":"📤 오답 완료 & 제출"}</button>
+            <button className="submit-btn" style={{background:student.color}} onClick={()=>{setMath(m=>({...m,done:true}));saveMath(true);}} disabled={submitting}>{saved.math?"✓ 저장됐어요!":submitting?"저장 중…":"📤 오답 완료 & 제출"}</button>
             {myMathComments.length>0&&<div className="s-comment-preview"><div className="scp-label">💬 선생님 댓글</div>{myMathComments.map(c=><div key={c.id} className="scp-item"><div className="scp-text">{c.text}</div></div>)}</div>}
             {mathHistory.length>0&&(
               <div style={{marginTop:24}}>
@@ -905,7 +907,7 @@ function StudentView(){
             </div>
             <div className="mc-label" style={{marginTop:8}}>한마디 (선택)</div>
             <textarea className="mission-comment-input" placeholder="미션 하고 나서 느낌을 써 보세요!" value={missionData.comment} onChange={e=>setMissionData({...missionData,comment:e.target.value})}/>
-            <button className="submit-btn" style={{background:student.color}} onClick={()=>{setMissionData(m=>({...m,done:true}));saveMission();}} disabled={submitting}>{saved.mission?"✓ 저장됐어요!":submitting?"저장 중…":"🎯 미션 완료 & 제출"}</button>
+            <button className="submit-btn" style={{background:student.color}} onClick={()=>{setMissionData(m=>({...m,done:true}));saveMission(true);}} disabled={submitting}>{saved.mission?"✓ 저장됐어요!":submitting?"저장 중…":"🎯 미션 완료 & 제출"}</button>
             {myMissionComments.length>0&&<div className="s-comment-preview"><div className="scp-label">💬 선생님 댓글</div>{myMissionComments.map(c=><div key={c.id} className="scp-item"><div className="scp-text">{c.text}</div></div>)}</div>}
             {missionHistory.length>0&&(
               <div style={{marginTop:24}}>
