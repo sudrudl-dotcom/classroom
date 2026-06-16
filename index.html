@@ -156,6 +156,13 @@ body{background:#f7f5f0;font-family:'Noto Sans KR',sans-serif;-webkit-tap-highli
 .mb-text{font-family:'Gaegu',cursive;font-size:22px;color:#2d3a2e}
 .mission-comment-input{width:100%;min-height:90px;padding:14px;border-radius:14px;border:2px solid #e0e0e0;font-size:14px;line-height:1.8;resize:none;outline:none;font-family:'Noto Sans KR',sans-serif;background:#fff}
 .mission-comment-input:focus{border-color:#4a7a4e}
+.missing-panel{background:#fff;border-bottom:1px solid #eee;padding:14px 20px}
+.mp-title{font-size:12px;font-weight:700;color:#aaa;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.mp-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.mp-col-title{font-size:12px;font-weight:700;color:#888;margin-bottom:6px}
+.mp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.mp-chip{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;border:1.5px solid;background:#fff;white-space:nowrap}
+.mp-done{font-size:12px;color:#4a7a4e;font-weight:700}
 @media(max-width:600px){
   .landing-title{font-size:34px}.landing-emoji{font-size:52px}
   .land-btn{width:120px;padding:22px 12px}
@@ -177,6 +184,8 @@ body{background:#f7f5f0;font-family:'Noto Sans KR',sans-serif;-webkit-tap-highli
   .mission-edit,.add-row{flex-direction:column}
   .mission-save-btn,.add-confirm-btn{width:100%}
   .student-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+  .mp-cols{grid-template-columns:1fr;gap:10px}
+  .missing-panel{padding:12px 14px}
   .student-card{padding:12px}
   .ss-title{font-size:28px}
   .ss-card{width:80px;height:96px}
@@ -451,6 +460,37 @@ function TeacherView(){
       </header>
 
       {tab==="writings"&&(
+        <div>
+          {!(mobileShowDetail&&window.innerWidth<=600)&&(()=>{
+            const notWriting=students.filter(s=>!(todaySubs[s.id]?.writing));
+            const notMath=students.filter(s=>!(todaySubs[s.id]?.math));
+            const notMission=students.filter(s=>!(todaySubs[s.id]?.mission));
+            return students.length>0&&(
+              <div className="missing-panel">
+                <div className="mp-title">📋 오늘({dateKey}) 미제출 현황 — 실시간</div>
+                <div className="mp-cols">
+                  <div>
+                    <div className="mp-col-title">📝 글똥 미제출 ({notWriting.length})</div>
+                    {notWriting.length===0?<div className="mp-done">모두 완료! 🎉</div>:(
+                      <div className="mp-chips">{notWriting.map(s=><span key={s.id} className="mp-chip" style={{borderColor:s.color,color:s.color}}>{s.name}</span>)}</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="mp-col-title">🔢 수학 미완료 ({notMath.length})</div>
+                    {notMath.length===0?<div className="mp-done">모두 완료! 🎉</div>:(
+                      <div className="mp-chips">{notMath.map(s=><span key={s.id} className="mp-chip" style={{borderColor:s.color,color:s.color}}>{s.name}</span>)}</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="mp-col-title">🎯 미션 미완료 ({notMission.length})</div>
+                    {notMission.length===0?<div className="mp-done">모두 완료! 🎉</div>:(
+                      <div className="mp-chips">{notMission.map(s=><span key={s.id} className="mp-chip" style={{borderColor:s.color,color:s.color}}>{s.name}</span>)}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         <div className="writings-layout">
           <aside className="writings-sidebar" style={mobileShowDetail&&window.innerWidth<=600?{display:"none"}:{}}>
             <div className="ws-title">학생 선택</div>
@@ -502,6 +542,7 @@ function TeacherView(){
               </>
             )}
           </main>
+        </div>
         </div>
       )}
 
