@@ -260,6 +260,10 @@ function TeacherView(){
   const[expandedMissionHist,setExpandedMissionHist]=React.useState({});
   const[missionHist,setMissionHist]=React.useState({});
   const[refreshing,setRefreshing]=React.useState(false);
+  // 미제출 누적 기록
+  const[attendanceData,setAttendanceData]=React.useState(null);
+  const[attendanceLoading,setAttendanceLoading]=React.useState(false);
+  const[expandedAttendance,setExpandedAttendance]=React.useState({});
 
   // ref로 항상 최신값 유지 → RT 콜백에서 stale closure 없이 사용
   const studentsRef=React.useRef([]);
@@ -353,6 +357,28 @@ function TeacherView(){
     setMathComments(mc);setMissionComments(msc);
   }
 
+  async function loadAttendance(){
+    setAttendanceLoading(true);
+    const ids=studentsRef.current.map(s=>s.id);
+    const{data:missionRows}=await sb.from("missions").select("date").eq("class_id",CLASS_ID).order("date");
+    const classDates=[...new Set((missionRows||[]).map(m=>m.date))].sort();
+    const{data:wRows}=await sb.from("writings").select("student_id,date").in("student_id",ids);
+    const{data:mRows}=await sb.from("maths").select("student_id,date,done").in("student_id",ids);
+    const{data:msRows}=await sb.from("mission_submissions").select("student_id,date,done").in("student_id",ids);
+    const byStudent={};
+    ids.forEach(id=>{
+      const wDates=new Set((wRows||[]).filter(r=>r.student_id===id).map(r=>r.date));
+      const mDates=new Set((mRows||[]).filter(r=>r.student_id===id&&r.done).map(r=>r.date));
+      const msDates=new Set((msRows||[]).filter(r=>r.student_id===id&&r.done).map(r=>r.date));
+      byStudent[id]={
+        missedWriting:classDates.filter(d=>!wDates.has(d)),
+        missedMath:classDates.filter(d=>!mDates.has(d)),
+        missedMission:classDates.filter(d=>!msDates.has(d)),
+      };
+    });
+    setAttendanceData({classDates,byStudent});
+    setAttendanceLoading(false);
+  }
   async function toggleMathHist(sid){
     if(expandedMathHist[sid]){setExpandedMathHist(p=>({...p,[sid]:false}));return;}
     const{data}=await sb.from("maths").select("*").eq("student_id",sid).order("date",{ascending:false});
@@ -562,7 +588,7 @@ function TeacherView(){
 
           <div className="t-section">
             <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              {[{key:"math",label:"🔢 수학 현황"},{key:"mission",label:"🎯 미션 현황"},{key:"manage",label:"👥 학생 관리"}].map(t=>(
+              {[{key:"math",label:"🔢 수학 현황"},{key:"mission",label:"🎯 미션 현황"},{key:"attendance",label:"📊 미제출 기록"},{key:"manage",label:"👥 학생 관리"}].map(t=>(
                 <button key={t.key} style={{padding:"8px 16px",borderRadius:20,border:"1.5px solid",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",background:detailTab===t.key?"#2d3a2e":"#fff",color:detailTab===t.key?"#fff":"#2d3a2e",borderColor:detailTab===t.key?"#2d3a2e":"#ddd"}} onClick={()=>setDetailTab(t.key)}>{t.label}</button>
               ))}
             </div>
@@ -645,6 +671,53 @@ function TeacherView(){
                           {m.comment&&<div style={{fontSize:13,color:"#444",marginTop:6,lineHeight:1.6}}>💬 {m.comment}</div>}
                         </div>
                       ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {detailTab==="attendance"&&(
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                {students.length===0&&<div className="no-select">학생을 먼저 등록하세요</div>}
+                <button onClick={loadAttendance} disabled={attendanceLoading} style={{padding:"10px 16px",background:"#2d3a2e",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Noto Sans KR',sans-serif",opacity:attendanceLoading?0.5:1,alignSelf:"flex-start"}}>
+                  {attendanceLoading?"불러오는 중…":attendanceData?"🔄 기록 새로고침":"📊 기록 불러오기"}
+                </button>
+                {attendanceData&&attendanceData.classDates.length===0&&<div className="no-select">아직 미션 등록 기록이 없어요</div>}
+                {attendanceData&&attendanceData.classDates.length>0&&students.map(s=>{
+                  const rec=attendanceData.byStudent[s.id]||{missedWriting:[],missedMath:[],missedMission:[]};
+                  const total=rec.missedWriting.length+rec.missedMath.length+rec.missedMission.length;
+                  return(
+                    <div key={s.id} className="entry-card" style={{borderLeft:`4px solid ${s.color}`}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setExpandedAttendance(p=>({...p,[s.id]:!p[s.id]}))}>
+                        <div style={{fontWeight:700,fontSize:16,color:s.color}}>{s.name}</div>
+                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          {total===0?<span className="mp-done">전부 완료 🎉</span>:(
+                            <>
+                              <span className="badge">📝 글 {rec.missedWriting.length}</span>
+                              <span className="badge">🔢 수학 {rec.missedMath.length}</span>
+                              <span className="badge">🎯 미션 {rec.missedMission.length}</span>
+                            </>
+                          )}
+                          <span style={{fontSize:12,color:"#bbb"}}>{expandedAttendance[s.id]?"▲":"▼"}</span>
+                        </div>
+                      </div>
+                      {expandedAttendance[s.id]&&(
+                        <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
+                          <div>
+                            <div className="mp-col-title">📝 글똥 미제출일 ({rec.missedWriting.length}/{attendanceData.classDates.length})</div>
+                            {rec.missedWriting.length===0?<div className="mp-done">모두 제출! 🎉</div>:<div className="mp-chips">{rec.missedWriting.map(d=><span key={d} className="mp-chip" style={{borderColor:s.color,color:s.color}}>{d}</span>)}</div>}
+                          </div>
+                          <div>
+                            <div className="mp-col-title">🔢 수학 미완료일 ({rec.missedMath.length}/{attendanceData.classDates.length})</div>
+                            {rec.missedMath.length===0?<div className="mp-done">모두 완료! 🎉</div>:<div className="mp-chips">{rec.missedMath.map(d=><span key={d} className="mp-chip" style={{borderColor:s.color,color:s.color}}>{d}</span>)}</div>}
+                          </div>
+                          <div>
+                            <div className="mp-col-title">🎯 미션 미완료일 ({rec.missedMission.length}/{attendanceData.classDates.length})</div>
+                            {rec.missedMission.length===0?<div className="mp-done">모두 완료! 🎉</div>:<div className="mp-chips">{rec.missedMission.map(d=><span key={d} className="mp-chip" style={{borderColor:s.color,color:s.color}}>{d}</span>)}</div>}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
